@@ -16,22 +16,35 @@ type InsightsResponse = {
   ai_summary?: string | null;
 };
 
+type FileMeta = {
+  id: string;
+  original_name: string;
+  uploaded_at: string;
+  size_bytes: number | null;
+  status: string;
+};
+
 type FiltersState = Record<string, string | null>;
 type TabId = "overview" | "health";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-// Human-readable chart title: strip the numeric prefix and snake_case
 function formatChartName(key: string): string {
-  // e.g. "missing_data_by_field" → "Missing Data by Field"
-  // e.g. "distribution_1_Sales_Amount" → "Distribution of Sales Amount"
   return key
+    .replace(/^timeseries_/, "Trend Over Time — ")
     .replace(/^(distribution|breakdown)_\d+_/, (_, type) =>
       type === "distribution" ? "Distribution — " : "Breakdown — "
     )
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatFileSize(bytes: number | null): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function FileInsightsPage() {
@@ -41,13 +54,31 @@ export default function FileInsightsPage() {
   const { theme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+
+  // File metadata (name, size, upload date)
+  const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
+
+  // Insights tab state
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [filtersState, setFiltersState] = useState<FiltersState>({});
   const [pendingFilters, setPendingFilters] = useState<FiltersState>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(true);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
 
   const hasToken = !!tokens?.accessToken;
+
+  // ---------------------------------------------------------------------------
+  // Fetch file metadata once on mount to get the file name
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!hasToken || !fileId) return;
+    fetch(`${API_BASE_URL}/api/files/${fileId}`, {
+      headers: { Authorization: `Bearer ${tokens!.accessToken}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setFileMeta(data as FileMeta); })
+      .catch(() => {/* silent — name not critical */});
+  }, [hasToken, fileId, tokens]);
 
   const plotTheme = useMemo(() => {
     if (typeof document === "undefined") {
@@ -55,19 +86,21 @@ export default function FileInsightsPage() {
     }
     const styles = getComputedStyle(document.documentElement);
     const textMain = styles.getPropertyValue("--text-main").trim() || "#e2e8f0";
-    const gridColor =
-      theme === "dark"
-        ? "rgba(226, 232, 240, 0.12)"
-        : "rgba(15, 23, 42, 0.12)";
-    return { fontColor: textMain, gridColor };
+    return {
+      fontColor: textMain,
+      gridColor: theme === "dark" ? "rgba(226, 232, 240, 0.12)" : "rgba(15, 23, 42, 0.12)",
+    };
   }, [theme]);
 
+  // ---------------------------------------------------------------------------
+  // Insights fetch
+  // ---------------------------------------------------------------------------
   const fetchInsightsWithFilters = useCallback(
     async (nextFilters: FiltersState) => {
       if (!hasToken || !fileId) return;
       try {
-        setLoading(true);
-        setError(null);
+        setLoadingInsights(true);
+        setInsightsError(null);
         const res = await fetch(`${API_BASE_URL}/api/files/${fileId}/insights`, {
           method: "POST",
           headers: {
@@ -78,29 +111,22 @@ export default function FileInsightsPage() {
         });
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(`Failed to load file overview (${res.status}): ${text || res.statusText}`);
+          throw new Error(text || "Failed to load file overview");
         }
-        const data = (await res.json()) as InsightsResponse;
-        setInsights(data);
+        setInsights((await res.json()) as InsightsResponse);
       } catch (err: any) {
-        console.error("Insights error:", err);
-        setError(err.message || "Failed to load file overview");
+        setInsightsError(err.message || "Failed to load file overview");
       } finally {
-        setLoading(false);
+        setLoadingInsights(false);
       }
     },
     [hasToken, fileId, tokens]
   );
 
-  const fetchInsights = useCallback(async () => {
-    await fetchInsightsWithFilters(filtersState);
-  }, [fetchInsightsWithFilters, filtersState]);
+  const fetchInsights = useCallback(() => fetchInsightsWithFilters(filtersState), [fetchInsightsWithFilters, filtersState]);
 
-  useEffect(() => {
-    fetchInsights();
-  }, [fetchInsights]);
+  useEffect(() => { fetchInsights(); }, [fetchInsights]);
 
-  // Debounce pending filters → applied filters
   useEffect(() => {
     const t = setTimeout(() => setFiltersState(pendingFilters), 500);
     return () => clearTimeout(t);
@@ -117,9 +143,8 @@ export default function FileInsightsPage() {
   const { kpis, charts, filters } = insights ?? { kpis: null, charts: null, filters: {} };
   const anyFilters = Object.keys(filters ?? {}).length > 0;
 
-  const handleFilterChange = (key: string, value: string | null) => {
+  const handleFilterChange = (key: string, value: string | null) =>
     setPendingFilters((prev) => ({ ...prev, [key]: value === "" ? null : value }));
-  };
 
   const clearAll = () => {
     setPendingFilters({});
@@ -127,22 +152,27 @@ export default function FileInsightsPage() {
     fetchInsightsWithFilters({});
   };
 
-  const tabs: { id: TabId; label: string; description: string }[] = [
-    {
-      id: "overview",
-      label: "File Overview",
-      description: "Charts and key metrics from your data",
-    },
-    {
-      id: "health",
-      label: "Data Health",
-      description: "Quality score, issues, and field-by-field breakdown",
-    },
+  // ---------------------------------------------------------------------------
+  // Build a friendly file title for the header
+  // ---------------------------------------------------------------------------
+  const fileTitle = fileMeta?.original_name ?? "File Analysis";
+  const fileSubtitle = fileMeta
+    ? [
+        `Uploaded ${new Date(fileMeta.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+        formatFileSize(fileMeta.size_bytes),
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
+
+  const tabs: { id: TabId; label: string; badge?: string }[] = [
+    { id: "overview", label: "File Overview" },
+    { id: "health",   label: "Data Health", badge: "Recommended" },
   ];
 
   return (
     <div className="flex w-full min-h-screen">
-      {/* LEFT FILTER PANEL — only shown on overview tab */}
+      {/* Filter sidebar — overview tab only */}
       {activeTab === "overview" && anyFilters && (
         <aside className="hidden lg:flex flex-col w-64 border-r border-[var(--border)] bg-[color:var(--bg-panel)] p-4 overflow-y-auto">
           <FilterPanel
@@ -154,80 +184,76 @@ export default function FileInsightsPage() {
               setFiltersState(pendingFilters);
               fetchInsightsWithFilters(pendingFilters);
             }}
-            onApplyPreset={(preset) => {
-              console.log("Preset:", preset);
-            }}
           />
         </aside>
       )}
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-        {/* Page header */}
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-[var(--text-main)]">
-              File Analysis
+        {/* Page header — shows real file name */}
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-[var(--text-main)] truncate">
+              {fileTitle}
             </h1>
-            <p className="mt-0.5 text-xs text-[var(--text-muted)] font-mono">
-              ID: <span className="text-cyan-300">{fileId}</span>
-            </p>
+            {fileSubtitle && (
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{fileSubtitle}</p>
+            )}
           </div>
 
           {activeTab === "overview" && (
             <button
               onClick={fetchInsights}
-              disabled={loading}
-              className="rounded-md border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-main)] hover:bg-[color:var(--bg-panel-2)] disabled:opacity-60"
+              disabled={loadingInsights}
+              className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-main)] hover:bg-[color:var(--bg-panel-2)] disabled:opacity-60"
               type="button"
             >
-              {loading ? "Refreshing…" : "Refresh"}
+              {loadingInsights ? "Refreshing…" : "Refresh"}
             </button>
           )}
         </header>
 
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-[var(--border)] pb-0">
+        <div className="flex gap-1 border-b border-[var(--border)]">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               type="button"
               className={[
-                "px-4 py-2 text-sm font-medium rounded-t-md transition-colors",
+                "relative px-4 py-2 text-sm font-medium rounded-t-md transition-colors",
                 activeTab === tab.id
                   ? "bg-[color:var(--bg-panel)] text-[var(--text-main)] border border-b-0 border-[var(--border)] -mb-px"
                   : "text-[var(--text-muted)] hover:text-[var(--text-main)]",
               ].join(" ")}
             >
               {tab.label}
+              {tab.badge && activeTab !== tab.id && (
+                <span className="ml-2 inline-block rounded-full bg-cyan-500/20 border border-cyan-500/40 px-1.5 py-0 text-[10px] font-semibold text-cyan-300 leading-4">
+                  ✓
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {/* ── Tab: File Overview ── */}
+        {/* ── File Overview ── */}
         {activeTab === "overview" && (
           <>
-            {/* Loading state */}
-            {loading && !insights && (
+            {loadingInsights && !insights && (
               <div className="py-12 text-center text-sm text-[var(--text-muted)]">
                 Loading your file…
               </div>
             )}
 
-            {/* Error banner */}
-            {error && (
-              <div className="rounded-md border border-red-700 bg-red-900/20 px-4 py-2 text-xs text-red-300">
-                {error}
+            {insightsError && (
+              <div className="rounded-md border border-red-700 bg-red-900/20 px-4 py-2 text-sm text-red-300">
+                {insightsError}
               </div>
             )}
 
-            {/* KPI Cards */}
             {kpis && Object.keys(kpis).length > 0 && (
               <section>
-                <h2 className="mb-3 text-sm font-semibold text-[var(--text-main)]">
-                  Key Metrics
-                </h2>
+                <h2 className="mb-3 text-sm font-semibold text-[var(--text-main)]">Key Metrics</h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {Object.entries(kpis).map(([label, value]) => (
                     <div
@@ -244,7 +270,6 @@ export default function FileInsightsPage() {
               </section>
             )}
 
-            {/* Charts */}
             {charts && Object.keys(charts).length > 0 && (
               <section className="space-y-6">
                 <h2 className="text-sm font-semibold text-[var(--text-main)]">Charts</h2>
@@ -264,10 +289,7 @@ export default function FileInsightsPage() {
                           autosize: true,
                           paper_bgcolor: "rgba(0,0,0,0)",
                           plot_bgcolor: "rgba(0,0,0,0)",
-                          font: {
-                            ...(fig.layout?.font || {}),
-                            color: plotTheme.fontColor,
-                          },
+                          font: { ...(fig.layout?.font || {}), color: plotTheme.fontColor },
                           xaxis: {
                             ...(fig.layout?.xaxis || {}),
                             gridcolor: plotTheme.gridColor,
@@ -279,11 +301,7 @@ export default function FileInsightsPage() {
                             zerolinecolor: plotTheme.gridColor,
                           },
                         }}
-                        config={{
-                          responsive: true,
-                          displaylogo: false,
-                          modeBarButtonsToRemove: ["toImage", "lasso2d", "select2d"],
-                        }}
+                        config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ["toImage", "lasso2d", "select2d"] }}
                         style={{ width: "100%", height: "100%" }}
                       />
                     </div>
@@ -292,25 +310,23 @@ export default function FileInsightsPage() {
               </section>
             )}
 
-            {/* No data yet */}
-            {!loading && !error && !insights && (
-              <div className="py-12 text-center text-sm text-[var(--text-muted)]">
-                No data available for this file.
-              </div>
+            {!loadingInsights && !insightsError && !insights && (
+              <div className="py-12 text-center text-sm text-[var(--text-muted)]">No data available.</div>
             )}
           </>
         )}
 
-        {/* ── Tab: Data Health ── */}
+        {/* ── Data Health ── */}
         {activeTab === "health" && (
           <HealthDiagnosticView
             fileId={fileId}
+            fileName={fileTitle}
             token={tokens!.accessToken ?? ""}
           />
         )}
       </main>
 
-      {/* AI floating button — only on overview tab */}
+      {/* AI summary button — overview tab only */}
       {activeTab === "overview" && (
         <AIWidget
           fileId={fileId}

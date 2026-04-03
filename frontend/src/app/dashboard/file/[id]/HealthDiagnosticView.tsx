@@ -3,23 +3,24 @@
 /**
  * HealthDiagnosticView
  *
- * Calls the backend POST /api/files/{fileId}/health endpoint and renders
- * the results in plain English for a non-technical business user.
+ * Fetches and renders the data health diagnostic for a single file.
+ * Results are cached in component state so switching tabs doesn't re-run
+ * the full analysis.
  *
  * Design principles:
  *  - No jargon visible to the user
- *  - Score + grade shown prominently
- *  - Each issue has a severity badge, plain explanation, and next step
- *  - Per-column breakdown is a collapsible table, sorted by worst first
+ *  - Score + grade shown prominently with a plain-language label
+ *  - Issues sorted by severity with a clear recommended action each
+ *  - Per-column table open by default for small datasets (≤ 15 cols)
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (mirror HealthOut from backend)
 // ---------------------------------------------------------------------------
 
 type IssueOut = {
@@ -37,11 +38,15 @@ type ColumnDetail = {
   distinct_count: number;
   total_count: number;
   inferred_type: string;
+  cardinality_class: string;
   min_value: number | null;
   max_value: number | null;
   mean_value: number | null;
   median_value: number | null;
   std_dev: number | null;
+  pct_25: number | null;
+  pct_75: number | null;
+  skewness: number | null;
   outlier_count: number | null;
   top_values: { value: string; count: number }[];
 };
@@ -52,6 +57,7 @@ type HealthResponse = {
   score_label: string;
   category_scores: Record<string, number>;
   category_labels: Record<string, string>;
+  scoring_explanation: Record<string, string>;
   issues: IssueOut[];
   column_details: ColumnDetail[];
   total_rows: number;
@@ -65,28 +71,24 @@ type HealthResponse = {
 
 function ScoreRing({ score, grade }: { score: number; grade: string }) {
   const color =
-    score >= 90
-      ? "#22c55e"
-      : score >= 80
-      ? "#84cc16"
-      : score >= 70
-      ? "#f59e0b"
-      : score >= 60
-      ? "#f97316"
-      : "#ef4444";
+    score >= 90 ? "#22c55e"
+    : score >= 80 ? "#84cc16"
+    : score >= 70 ? "#f59e0b"
+    : score >= 60 ? "#f97316"
+    : "#ef4444";
 
   return (
-    <div className="flex flex-col items-center justify-center">
+    <div className="flex flex-col items-center justify-center gap-1">
       <div
-        className="relative flex items-center justify-center rounded-full w-28 h-28 border-8"
+        className="flex items-center justify-center rounded-full w-28 h-28 border-8"
         style={{ borderColor: color }}
       >
-        <div>
-          <p className="text-3xl font-bold text-[var(--text-main)]">{score}</p>
-          <p className="text-center text-xs text-[var(--text-muted)]">/ 100</p>
+        <div className="text-center">
+          <p className="text-3xl font-bold text-[var(--text-main)] leading-none">{score}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">out of 100</p>
         </div>
       </div>
-      <p className="mt-2 text-xl font-semibold" style={{ color }}>
+      <p className="text-xl font-semibold" style={{ color }}>
         Grade {grade}
       </p>
     </div>
@@ -94,78 +96,55 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
-  const styles: Record<string, string> = {
-    critical: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-300 dark:border-red-800",
-    warning: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800",
-    info: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-300 dark:border-blue-800",
+  const map: Record<string, { cls: string; label: string }> = {
+    critical: {
+      cls: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-300 dark:border-red-800",
+      label: "Action Required",
+    },
+    warning: {
+      cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800",
+      label: "Warning",
+    },
+    info: {
+      cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-300 dark:border-blue-800",
+      label: "Note",
+    },
   };
-  const labels: Record<string, string> = {
-    critical: "Critical",
-    warning: "Warning",
-    info: "Note",
-  };
-
+  const { cls, label } = map[severity] ?? map.info;
   return (
-    <span
-      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${
-        styles[severity] ?? styles.info
-      }`}
-    >
-      {labels[severity] ?? severity}
+    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${cls}`}>
+      {label}
     </span>
   );
 }
 
 function IssueCard({ issue }: { issue: IssueOut }) {
   const borderColor =
-    issue.severity === "critical"
-      ? "border-red-400/50"
-      : issue.severity === "warning"
-      ? "border-amber-400/50"
-      : "border-blue-400/30";
+    issue.severity === "critical" ? "border-red-400/50"
+    : issue.severity === "warning" ? "border-amber-400/50"
+    : "border-blue-400/30";
 
   return (
-    <div
-      className={`rounded-xl border ${borderColor} bg-[color:var(--bg-panel)] p-4 space-y-2`}
-    >
-      <div className="flex items-start gap-3">
+    <div className={`rounded-xl border ${borderColor} bg-[color:var(--bg-panel)] p-4 space-y-2`}>
+      <div className="flex items-start gap-3 flex-wrap">
         <SeverityBadge severity={issue.severity} />
-        <p className="font-semibold text-[var(--text-main)] text-sm leading-snug">
-          {issue.title}
-        </p>
+        <p className="font-semibold text-[var(--text-main)] text-sm leading-snug">{issue.title}</p>
       </div>
-
-      <p className="text-sm text-[var(--text-muted)] leading-relaxed">
-        {issue.plain_message}
-      </p>
-
+      <p className="text-sm text-[var(--text-muted)] leading-relaxed">{issue.plain_message}</p>
       <div className="rounded-lg bg-[color:var(--bg-main)] border border-[var(--border)] px-3 py-2">
-        <p className="text-xs font-semibold text-[var(--text-main)] mb-0.5">
-          Recommended action
-        </p>
-        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-          {issue.recommendation}
-        </p>
+        <p className="text-xs font-semibold text-[var(--text-main)] mb-0.5">Next step</p>
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed">{issue.recommendation}</p>
       </div>
     </div>
   );
 }
 
-function CategoryScoreBar({
-  label,
-  score,
-}: {
-  label: string;
-  score: number;
-}) {
+function CategoryBar({ label, score, explanation }: { label: string; score: number; explanation?: string }) {
   const color =
-    score >= 90
-      ? "#22c55e"
-      : score >= 75
-      ? "#84cc16"
-      : score >= 60
-      ? "#f59e0b"
-      : "#ef4444";
+    score >= 90 ? "#22c55e"
+    : score >= 75 ? "#84cc16"
+    : score >= 60 ? "#f59e0b"
+    : "#ef4444";
 
   return (
     <div className="space-y-1">
@@ -179,30 +158,54 @@ function CategoryScoreBar({
           style={{ width: `${score}%`, backgroundColor: color }}
         />
       </div>
+      {explanation && (
+        <p className="text-[11px] text-[var(--text-muted)]">{explanation}</p>
+      )}
     </div>
   );
 }
 
+function friendlyName(col: string) {
+  return col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function NullBadge({ rate }: { rate: number }) {
+  if (rate === 0)
+    return <span className="text-emerald-500 text-xs font-medium">Complete</span>;
+  const pct = (rate * 100).toFixed(1);
+  const color = rate > 0.2 ? "text-red-400" : rate > 0.05 ? "text-amber-400" : "text-yellow-400";
+  return <span className={`text-xs font-medium ${color}`}>{pct}% empty</span>;
+}
+
+function CardinalityBadge({ cls }: { cls: string }) {
+  const map: Record<string, string> = {
+    constant: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+    binary: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    low: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+    medium: "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400",
+    high: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+    unique: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+  };
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium capitalize ${map[cls] ?? map.medium}`}>
+      {cls}
+    </span>
+  );
+}
+
 function ColumnTable({ columns }: { columns: ColumnDetail[] }) {
-  const [open, setOpen] = useState(false);
+  // Default open for small datasets so users discover the breakdown automatically
+  const [open, setOpen] = useState(columns.length <= 15);
 
   const sorted = [...columns].sort((a, b) => b.null_rate - a.null_rate);
 
-  function friendlyName(col: string) {
-    return col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-
-  function nullBadge(rate: number) {
-    if (rate === 0)
-      return <span className="text-emerald-500 text-xs font-medium">Complete</span>;
-    const pct = (rate * 100).toFixed(1);
-    const color =
-      rate > 0.2
-        ? "text-red-400"
-        : rate > 0.05
-        ? "text-amber-400"
-        : "text-yellow-400";
-    return <span className={`text-xs font-medium ${color}`}>{pct}% empty</span>;
+  function skewLabel(skew: number | null): string {
+    if (skew == null) return "—";
+    if (Math.abs(skew) < 0.5) return "Balanced";
+    if (skew > 1) return "Very right-skewed";
+    if (skew > 0.5) return "Right-skewed";
+    if (skew < -1) return "Very left-skewed";
+    return "Left-skewed";
   }
 
   return (
@@ -220,47 +223,48 @@ function ColumnTable({ columns }: { columns: ColumnDetail[] }) {
         <div className="overflow-x-auto border-t border-[var(--border)]">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-[var(--border)] text-[var(--text-muted)]">
-                <th className="px-4 py-2 text-left font-medium">Field Name</th>
-                <th className="px-4 py-2 text-left font-medium">Type</th>
-                <th className="px-4 py-2 text-left font-medium">Completeness</th>
-                <th className="px-4 py-2 text-left font-medium">Unique Values</th>
-                <th className="px-4 py-2 text-left font-medium">Min</th>
-                <th className="px-4 py-2 text-left font-medium">Max</th>
-                <th className="px-4 py-2 text-left font-medium">Average</th>
-                <th className="px-4 py-2 text-left font-medium">Unusual Values</th>
+              <tr className="border-b border-[var(--border)] text-[var(--text-muted)] bg-[color:var(--bg-main)]">
+                <th className="px-3 py-2 text-left font-medium">Field</th>
+                <th className="px-3 py-2 text-left font-medium">Type</th>
+                <th className="px-3 py-2 text-left font-medium">Values</th>
+                <th className="px-3 py-2 text-left font-medium">Completeness</th>
+                <th className="px-3 py-2 text-left font-medium">Unique Count</th>
+                <th className="px-3 py-2 text-left font-medium">Min</th>
+                <th className="px-3 py-2 text-left font-medium">Median</th>
+                <th className="px-3 py-2 text-left font-medium">Max</th>
+                <th className="px-3 py-2 text-left font-medium">Distribution Shape</th>
+                <th className="px-3 py-2 text-left font-medium">Unusual Values</th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((col) => (
-                <tr
-                  key={col.name}
-                  className="border-b border-[var(--border)] hover:bg-[color:var(--bg-main)]"
-                >
-                  <td className="px-4 py-2 font-medium text-[var(--text-main)] max-w-[160px] truncate">
+                <tr key={col.name} className="border-b border-[var(--border)] hover:bg-[color:var(--bg-main)]">
+                  <td className="px-3 py-2 font-medium text-[var(--text-main)] max-w-[140px] truncate" title={col.name}>
                     {friendlyName(col.name)}
                   </td>
-                  <td className="px-4 py-2 text-[var(--text-muted)] capitalize">
-                    {col.inferred_type}
+                  <td className="px-3 py-2 capitalize text-[var(--text-muted)]">{col.inferred_type}</td>
+                  <td className="px-3 py-2">
+                    <CardinalityBadge cls={col.cardinality_class} />
                   </td>
-                  <td className="px-4 py-2">{nullBadge(col.null_rate)}</td>
-                  <td className="px-4 py-2 text-[var(--text-muted)]">
-                    {col.distinct_count.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2 text-[var(--text-muted)]">
+                  <td className="px-3 py-2"><NullBadge rate={col.null_rate} /></td>
+                  <td className="px-3 py-2 text-[var(--text-muted)]">{col.distinct_count.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-[var(--text-muted)]">
                     {col.min_value != null ? col.min_value.toLocaleString() : "—"}
                   </td>
-                  <td className="px-4 py-2 text-[var(--text-muted)]">
+                  <td className="px-3 py-2 text-[var(--text-muted)]">
+                    {col.median_value != null ? col.median_value.toLocaleString() : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-[var(--text-muted)]">
                     {col.max_value != null ? col.max_value.toLocaleString() : "—"}
                   </td>
-                  <td className="px-4 py-2 text-[var(--text-muted)]">
-                    {col.mean_value != null ? col.mean_value.toLocaleString() : "—"}
-                  </td>
-                  <td className="px-4 py-2">
+                  <td className="px-3 py-2 text-[var(--text-muted)]">{skewLabel(col.skewness)}</td>
+                  <td className="px-3 py-2">
                     {col.outlier_count != null && col.outlier_count > 0 ? (
                       <span className="text-amber-400">{col.outlier_count.toLocaleString()}</span>
-                    ) : (
+                    ) : col.outlier_count === 0 ? (
                       <span className="text-emerald-500">None</span>
+                    ) : (
+                      <span className="text-[var(--text-muted)]">—</span>
                     )}
                   </td>
                 </tr>
@@ -274,22 +278,30 @@ function ColumnTable({ columns }: { columns: ColumnDetail[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Main component — with session caching to avoid re-fetching on tab switch
 // ---------------------------------------------------------------------------
+
+// Module-level cache keyed by fileId — survives tab switches within the session
+const healthCache: Record<string, HealthResponse> = {};
 
 export default function HealthDiagnosticView({
   fileId,
+  fileName,
   token,
 }: {
   fileId: string;
+  fileName?: string;
   token: string;
 }) {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [health, setHealth] = useState<HealthResponse | null>(healthCache[fileId] ?? null);
+  const [loading, setLoading] = useState(!healthCache[fileId]);
   const [error, setError] = useState<string | null>(null);
+  const hasFetched = useRef(!!healthCache[fileId]);
 
   useEffect(() => {
-    if (!fileId || !token) return;
+    if (!fileId || !token || hasFetched.current) return;
+    hasFetched.current = true;
+
     let cancelled = false;
 
     async function fetchHealth() {
@@ -306,14 +318,19 @@ export default function HealthDiagnosticView({
         });
 
         if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Health check failed (${res.status}): ${text || res.statusText}`);
+          const text = await res.text().catch(() => "");
+          // Strip HTTP status codes from user-facing messages
+          const clean = text.replace(/^\s*\d{3}[:\s]+/, "").replace(/^"(.*)"$/, "$1") || "We couldn't analyze this file right now. Please try again.";
+          throw new Error(clean);
         }
 
         const data = (await res.json()) as HealthResponse;
-        if (!cancelled) setHealth(data);
+        if (!cancelled) {
+          healthCache[fileId] = data;
+          setHealth(data);
+        }
       } catch (err: any) {
-        if (!cancelled) setError(err.message || "Could not load health diagnostics");
+        if (!cancelled) setError(err.message || "We couldn't analyze this file right now.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -325,11 +342,14 @@ export default function HealthDiagnosticView({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-sm text-[var(--text-muted)]">
-        <div className="text-center space-y-2">
-          <div className="animate-pulse text-2xl">🔍</div>
-          <p>Analysing your data…</p>
-          <p className="text-xs">This may take a few seconds for larger files.</p>
+      <div className="flex items-center justify-center py-24 text-sm text-[var(--text-muted)]">
+        <div className="text-center space-y-3">
+          <div className="text-3xl animate-pulse">🔍</div>
+          <p className="font-medium text-[var(--text-main)]">Analyzing your data…</p>
+          <p className="text-xs max-w-xs">
+            We're checking for missing values, duplicates, formatting issues, and unusual values.
+            This may take a few seconds for larger files.
+          </p>
         </div>
       </div>
     );
@@ -337,9 +357,22 @@ export default function HealthDiagnosticView({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-500/40 bg-red-950/20 px-4 py-4 text-sm text-red-300 space-y-1">
-        <p className="font-semibold">Could not run health check</p>
-        <p className="text-xs text-red-400">{error}</p>
+      <div className="rounded-xl border border-red-500/40 bg-red-950/20 p-5 space-y-2">
+        <p className="font-semibold text-red-300">Could not run health check</p>
+        <p className="text-sm text-red-400">{error}</p>
+        <button
+          type="button"
+          onClick={() => {
+            delete healthCache[fileId];
+            hasFetched.current = false;
+            setLoading(true);
+            setError(null);
+            setHealth(null);
+          }}
+          className="mt-1 text-xs text-red-300 underline"
+        >
+          Try again
+        </button>
       </div>
     );
   }
@@ -347,47 +380,49 @@ export default function HealthDiagnosticView({
   if (!health) return null;
 
   const criticalCount = health.issues.filter((i) => i.severity === "critical").length;
-  const warningCount = health.issues.filter((i) => i.severity === "warning").length;
+  const warningCount  = health.issues.filter((i) => i.severity === "warning").length;
+  const infoCount     = health.issues.filter((i) => i.severity === "info").length;
+
+  const issuesSectionTitle =
+    criticalCount > 0
+      ? "Issues Requiring Your Attention"
+      : warningCount > 0
+      ? "Warnings to Review"
+      : "Notes";
 
   return (
     <div className="space-y-6">
-      {/* ---- Score Header ---- */}
+      {/* ---- Score card ---- */}
       <div className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] p-6">
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <ScoreRing score={health.score} grade={health.grade} />
 
-          <div className="flex-1 space-y-4">
+          <div className="flex-1 space-y-4 min-w-0">
+            {fileName && (
+              <p className="text-xs text-[var(--text-muted)] truncate font-mono">{fileName}</p>
+            )}
             <div>
-              <h2 className="text-lg font-semibold text-[var(--text-main)]">
-                {health.score_label}
-              </h2>
+              <h2 className="text-lg font-semibold text-[var(--text-main)]">{health.score_label}</h2>
               <p className="mt-1 text-sm text-[var(--text-muted)]">
-                Analysed{" "}
-                <strong className="text-[var(--text-main)]">
-                  {health.total_rows.toLocaleString()} records
-                </strong>{" "}
+                Analyzed{" "}
+                <strong className="text-[var(--text-main)]">{health.total_rows.toLocaleString()} records</strong>{" "}
                 across{" "}
-                <strong className="text-[var(--text-main)]">
-                  {health.total_columns} fields
-                </strong>
+                <strong className="text-[var(--text-main)]">{health.total_columns} fields</strong>
                 {health.duplicate_count > 0 && (
-                  <>
-                    {" "}·{" "}
-                    <span className="text-amber-400">
-                      {health.duplicate_count.toLocaleString()} duplicate records found
-                    </span>
-                  </>
+                  <span className="text-amber-400 ml-1">
+                    · {health.duplicate_count.toLocaleString()} duplicate rows found
+                  </span>
                 )}
               </p>
             </div>
 
-            {/* Category bars */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {Object.entries(health.category_scores).map(([key, score]) => (
-                <CategoryScoreBar
+                <CategoryBar
                   key={key}
                   label={health.category_labels[key] ?? key}
                   score={score}
+                  explanation={health.scoring_explanation?.[key]}
                 />
               ))}
             </div>
@@ -396,44 +431,38 @@ export default function HealthDiagnosticView({
 
         {/* Issue count summary */}
         {health.issues.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-wrap gap-3 text-sm">
+          <div className="mt-5 pt-4 border-t border-[var(--border)] flex flex-wrap gap-4 text-sm">
             {criticalCount > 0 && (
-              <span className="text-red-400">
+              <span className="text-red-400 font-medium">
                 ⚠ {criticalCount} critical {criticalCount === 1 ? "issue" : "issues"}
               </span>
             )}
             {warningCount > 0 && (
-              <span className="text-amber-400">
+              <span className="text-amber-400 font-medium">
                 ⚡ {warningCount} {warningCount === 1 ? "warning" : "warnings"}
               </span>
             )}
-            {health.issues.filter((i) => i.severity === "info").length > 0 && (
+            {infoCount > 0 && (
               <span className="text-blue-400">
-                ℹ {health.issues.filter((i) => i.severity === "info").length}{" "}
-                {health.issues.filter((i) => i.severity === "info").length === 1
-                  ? "note"
-                  : "notes"}
+                ℹ {infoCount} {infoCount === 1 ? "note" : "notes"}
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* ---- Issues List ---- */}
+      {/* ---- Issues list ---- */}
       {health.issues.length > 0 ? (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-[var(--text-main)]">
-            What We Found
-          </h3>
-          {/* Show critical first, then warnings, then info */}
-          {(["critical", "warning", "info"] as const).map((sev) =>
+          <h3 className="text-sm font-semibold text-[var(--text-main)]">{issuesSectionTitle}</h3>
+          {(["critical", "warning", "info"] as const).flatMap((sev) =>
             health.issues
               .filter((i) => i.severity === sev)
               .map((issue) => <IssueCard key={issue.key} issue={issue} />)
           )}
         </div>
       ) : (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-5 text-center">
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-6 text-center">
           <p className="text-emerald-400 font-semibold text-lg">✓ No significant issues found</p>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             Your dataset passed all health checks. Keep up the good work!

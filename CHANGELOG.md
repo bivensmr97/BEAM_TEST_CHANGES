@@ -4,6 +4,18 @@ All notable changes to the BEAM Analytics platform are documented here.
 
 ---
 
+## [Unreleased] — 2026-04-03 (Pass 3 — Presentation Polish)
+
+### Added / Changed (Pass 3)
+
+#### Frontend Presentation Fixes
+
+- **Removed dead preset filter buttons** — the "High-Value Records", "Missing Data Check", and "Outliers" preset buttons in `FilterPanel.tsx` did nothing when clicked. They have been removed to prevent client confusion and restore trust in the UI. The `onApplyPreset` prop has been removed from the component entirely.
+- **TopNav subtitle updated** — "Multi-tenant ingest & insights" changed to "Data Quality Platform". The technical `user.role` badge (admin/user) has been removed from the nav bar; it is meaningless to business users.
+- **AI button relabelled** — the floating cyan circle labeled "AI" is now labeled "AI Summary" with a descriptive `title` tooltip ("Get an AI-generated summary of your file's contents and quality") and a full `aria-label` for accessibility. The button shape is now pill-style to accommodate the longer label.
+
+---
+
 ## [Unreleased] — 2026-04-03
 
 ### Summary

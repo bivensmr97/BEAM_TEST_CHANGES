@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import json
 import math
 import pandas as pd
@@ -13,15 +14,15 @@ from app.config import get_settings
 
 settings = get_settings()
 
-# Maximum rows sent to chart-building functions (prevents memory/timeout issues)
 MAX_ROWS_FOR_CHARTS = 50_000
-# Maximum rows loaded from blob (guard against enormous files)
-MAX_ROWS_LOAD = 500_000
+MAX_ROWS_LOAD       = 500_000
+MAX_KPI_CARDS       = 5       # cap on KPI cards shown
 
 
-# -------------------------
-# Helpers: make payload JSON-safe
-# -------------------------
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 def _clean_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna(how="all")
@@ -46,64 +47,51 @@ def _json_safe(obj):
 
 def _friendly_col_name(col: str) -> str:
     """Convert snake_case or CamelCase column names to friendly Title Case."""
-    # Replace underscores/hyphens with spaces then title-case
     name = col.replace("_", " ").replace("-", " ")
-    # Insert space before capital letters in CamelCase
-    import re
     name = re.sub(r"([a-z])([A-Z])", r"\1 \2", name)
     return name.strip().title()
 
 
-# -------------------------
-# AI Summary (non-blocking wrapper)
-# -------------------------
+# ---------------------------------------------------------------------------
+# AI Summary
+# ---------------------------------------------------------------------------
+
 def generate_ai_summary(df: pd.DataFrame) -> str:
     API_KEY = os.getenv("OPENAI_API_KEY")
     if not API_KEY:
-        return None  # Caller will omit the field rather than showing an error message
+        return None
 
     try:
         client = OpenAI(api_key=API_KEY)
-
-        # Use a compact sample to minimise token cost
         sample = df.head(20).to_csv(index=False)
-        col_info = ", ".join(
-            f"{c} ({df[c].dtype})" for c in df.columns[:20]
-        )
+        col_info = ", ".join(f"{c} ({df[c].dtype})" for c in df.columns[:20])
         prompt = (
             "You are a data analyst helping a non-technical business owner understand their data. "
-            "Write 2-3 plain English sentences summarising the main patterns and any obvious quality issues "
-            "in the dataset below. Avoid jargon. Focus on what a business owner would care about.\n\n"
-            f"Columns: {col_info}\n\n"
-            f"Sample rows:\n{sample}"
+            "Write 2–3 plain English sentences summarizing the main patterns and any obvious quality issues. "
+            "Avoid jargon. Focus on what a business owner would care about.\n\n"
+            f"Columns: {col_info}\n\nSample rows:\n{sample}"
         )
-
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
         )
         return response.choices[0].message.content.strip()
-
     except Exception:
         return None
 
 
-# -------------------------
-# Load file from Azure Blob
-# -------------------------
+# ---------------------------------------------------------------------------
+# Blob loader
+# ---------------------------------------------------------------------------
+
 def load_file_from_blob(blob_path: str) -> pd.DataFrame:
     try:
-        blob_service = BlobServiceClient.from_connection_string(
-            settings.AZURE_BLOB_CONNSTRING
-        )
+        blob_service = BlobServiceClient.from_connection_string(settings.AZURE_BLOB_CONNSTRING)
         container = blob_service.get_container_client(settings.BLOB_CONTAINER)
-
-        blob = container.get_blob_client(blob_path)
-        data = blob.download_blob().readall()
+        data = container.get_blob_client(blob_path).download_blob().readall()
 
         path = blob_path.lower()
-
         if path.endswith(".csv"):
             try:
                 df = pd.read_csv(io.BytesIO(data), nrows=MAX_ROWS_LOAD)
@@ -117,24 +105,26 @@ def load_file_from_blob(blob_path: str) -> pd.DataFrame:
             raise HTTPException(400, "Unsupported file type")
 
         return _clean_df(df)
-
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(500, f"Could not read your file: {e}")
 
 
-# -------------------------
-# Compute KPIs
-# -------------------------
+# ---------------------------------------------------------------------------
+# KPIs
+# ---------------------------------------------------------------------------
+
 def _is_id_like(col: str, s: pd.Series) -> bool:
-    """Heuristic: returns True if a column looks like an ID/index (skip averaging)."""
     col_lower = col.lower()
     id_keywords = ("id", "index", "key", "code", "number", "num", "no", "seq", "ref")
-    if any(col_lower == kw or col_lower.endswith(f"_{kw}") or col_lower.endswith(f" {kw}")
-           for kw in id_keywords):
+    if any(
+        col_lower == kw
+        or col_lower.endswith(f"_{kw}")
+        or col_lower.endswith(f" {kw}")
+        for kw in id_keywords
+    ):
         return True
-    # If all values are sequential integers, it's likely an index
     if pd.api.types.is_integer_dtype(s):
         non_null = s.dropna()
         if len(non_null) > 10 and non_null.nunique() == len(non_null):
@@ -144,13 +134,28 @@ def _is_id_like(col: str, s: pd.Series) -> bool:
     return False
 
 
+def _col_variance_rank(df: pd.DataFrame, col: str) -> float:
+    """Return a sortable score: higher = more 'interesting' numeric column."""
+    s = df[col].dropna()
+    if len(s) == 0:
+        return 0.0
+    std = float(s.std())
+    mean = abs(float(s.mean())) or 1.0
+    return std / mean  # coefficient of variation
+
+
 def compute_kpis(df: pd.DataFrame) -> dict:
     kpis = {"Total Records": int(len(df))}
 
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        if _is_id_like(col, df[col]):
-            continue
+    numeric_cols = [
+        c for c in df.select_dtypes(include=[np.number]).columns
+        if not _is_id_like(c, df[c])
+    ]
+
+    # Rank by coefficient of variation (most variable first — more interesting)
+    ranked = sorted(numeric_cols, key=lambda c: _col_variance_rank(df, c), reverse=True)
+
+    for col in ranked[: MAX_KPI_CARDS - 1]:  # -1 because Total Records is already in
         mean_val = df[col].mean(skipna=True)
         if pd.notna(mean_val):
             kpis[f"Average {_friendly_col_name(col)}"] = round(float(mean_val), 2)
@@ -158,97 +163,156 @@ def compute_kpis(df: pd.DataFrame) -> dict:
     return kpis
 
 
-# -------------------------
-# Build Charts
-# -------------------------
+# ---------------------------------------------------------------------------
+# Chart helpers
+# ---------------------------------------------------------------------------
+
 def safe_fig(fig) -> dict:
     return json.loads(fig.to_json())
 
 
 def _pick_interesting_numeric_cols(df: pd.DataFrame, max_cols: int = 3) -> list:
-    """Return up to max_cols numeric columns that are not ID-like."""
-    candidates = []
-    for col in df.select_dtypes(include=[np.number]).columns:
-        if not _is_id_like(col, df[col]):
-            candidates.append(col)
-        if len(candidates) >= max_cols:
-            break
-    return candidates
+    candidates = [c for c in df.select_dtypes(include=[np.number]).columns if not _is_id_like(c, df[c])]
+    return candidates[:max_cols]
 
 
 def _pick_interesting_cat_cols(df: pd.DataFrame, max_cols: int = 2) -> list:
-    """Return up to max_cols categorical columns with useful cardinality (2–50 unique values)."""
-    candidates = []
+    return [
+        c for c in df.select_dtypes(include=["object"]).columns
+        if 2 <= df[c].nunique(dropna=True) <= 50
+    ][:max_cols]
+
+
+def _detect_datetime_col(df: pd.DataFrame) -> str | None:
+    """Return the name of the most likely date/time column, or None."""
+    # First check native datetime dtypes
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            return col
+    # Then try parsing object columns that look like dates
+    date_pattern = re.compile(r"^\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4}$")
     for col in df.select_dtypes(include=["object"]).columns:
-        n_unique = df[col].nunique(dropna=True)
-        if 2 <= n_unique <= 50:
-            candidates.append(col)
-        if len(candidates) >= max_cols:
-            break
-    return candidates
+        sample = df[col].dropna().astype(str).head(100)
+        if len(sample) == 0:
+            continue
+        match_rate = float(sample.str.match(date_pattern).mean())
+        if match_rate > 0.8:
+            try:
+                parsed = pd.to_datetime(df[col], errors="coerce")
+                if parsed.notna().mean() > 0.8:
+                    return col
+            except Exception:
+                pass
+    return None
 
 
 def build_charts(df: pd.DataFrame) -> dict:
     charts = {}
 
-    # --- 1. Missing Data by Field ---
+    # -----------------------------------------------------------------------
+    # 1. Missing Data by Field (always shown)
+    # -----------------------------------------------------------------------
     null_rates = df.isna().mean()
-    # Only show columns that have at least some missing data, sorted worst-first
     missing = null_rates[null_rates > 0].sort_values(ascending=False)
+
     if not missing.empty:
-        # If all columns are complete, still show top-10 with 0% so user can see the clean state
-        display = missing.head(20) if not missing.empty else null_rates.head(20)
+        display = missing.head(20)
         labels = [_friendly_col_name(c) for c in display.index]
         values = [round(v * 100, 1) for v in display.values]
         colors = ["#ef4444" if v > 20 else "#f59e0b" if v > 5 else "#22c55e" for v in values]
-
         fig = go.Figure(go.Bar(
-            x=values,
-            y=labels,
-            orientation="h",
+            x=values, y=labels, orientation="h",
             marker_color=colors,
-            text=[f"{v}%" for v in values],
-            textposition="outside",
+            text=[f"{v}%" for v in values], textposition="outside",
         ))
         fig.update_layout(
             title="Missing Information by Field (% of records empty)",
-            xaxis_title="Percentage of records with missing data",
-            yaxis_title=None,
+            xaxis_title="% of records with missing data",
             yaxis={"autorange": "reversed"},
-            margin={"l": 10, "r": 40, "t": 50, "b": 40},
+            margin={"l": 10, "r": 50, "t": 50, "b": 40},
         )
         charts["missing_data_by_field"] = safe_fig(fig)
     else:
-        # All complete — show a clean summary chart
         labels = [_friendly_col_name(c) for c in df.columns[:15]]
         fig = go.Figure(go.Bar(
-            x=[100] * len(labels),
-            y=labels,
-            orientation="h",
+            x=[100] * len(labels), y=labels, orientation="h",
             marker_color="#22c55e",
-            text=["100%"] * len(labels),
-            textposition="outside",
+            text=["100%"] * len(labels), textposition="outside",
         ))
         fig.update_layout(
-            title="Missing Information by Field — All Fields Complete!",
+            title="All Fields Complete — No Missing Data Found",
             xaxis_title="Completeness (%)",
             yaxis={"autorange": "reversed"},
-            margin={"l": 10, "r": 40, "t": 50, "b": 40},
+            margin={"l": 10, "r": 50, "t": 50, "b": 40},
         )
         charts["missing_data_by_field"] = safe_fig(fig)
 
-    # --- 2. Distribution of key numeric columns (up to 3) ---
-    numeric_interest = _pick_interesting_numeric_cols(df, max_cols=3)
-    for i, col in enumerate(numeric_interest):
+    # -----------------------------------------------------------------------
+    # 2. Time-series chart (if a date column is detected)
+    # -----------------------------------------------------------------------
+    date_col = _detect_datetime_col(df)
+    numeric_for_ts = _pick_interesting_numeric_cols(df, max_cols=1)
+
+    if date_col and numeric_for_ts:
+        val_col = numeric_for_ts[0]
+        try:
+            ts_df = df[[date_col, val_col]].copy()
+            ts_df[date_col] = pd.to_datetime(ts_df[date_col], errors="coerce")
+            ts_df = ts_df.dropna()
+            ts_df = ts_df.sort_values(date_col)
+
+            # Resample to a sensible frequency if many rows
+            if len(ts_df) > 365:
+                ts_df = ts_df.set_index(date_col).resample("ME")[val_col].mean().reset_index()
+                freq_label = "Monthly average"
+            elif len(ts_df) > 90:
+                ts_df = ts_df.set_index(date_col).resample("W")[val_col].mean().reset_index()
+                freq_label = "Weekly average"
+            else:
+                freq_label = "Daily"
+
+            friendly_val = _friendly_col_name(val_col)
+            friendly_date = _friendly_col_name(date_col)
+
+            fig = px.line(
+                ts_df, x=date_col, y=val_col,
+                title=f"{friendly_val} Over Time ({freq_label})",
+                labels={date_col: friendly_date, val_col: friendly_val},
+                color_discrete_sequence=["#06b6d4"],
+            )
+            fig.update_layout(
+                xaxis_title=friendly_date,
+                yaxis_title=friendly_val,
+                margin={"l": 10, "r": 10, "t": 50, "b": 40},
+            )
+            charts[f"timeseries_{val_col}"] = safe_fig(fig)
+        except Exception:
+            pass  # Time series failed silently — fall through to histograms
+
+    # -----------------------------------------------------------------------
+    # 3. Distribution of key numeric columns (skip if time-series was built)
+    # -----------------------------------------------------------------------
+    if date_col and f"timeseries_{numeric_for_ts[0]}" in charts if numeric_for_ts else False:
+        # Already have a time-series for the first numeric col; histogram remaining ones
+        remaining = _pick_interesting_numeric_cols(df, max_cols=4)[1:]
+    else:
+        remaining = _pick_interesting_numeric_cols(df, max_cols=3)
+
+    for i, col in enumerate(remaining):
         dff = df[col].dropna()
         if len(dff) == 0:
             continue
+
         friendly = _friendly_col_name(col)
+
+        # Clip display at 99th percentile to avoid extreme skew compressing the chart
+        p99 = float(dff.quantile(0.99))
+        clipped = dff[dff <= p99]
+        note = f" (values above {p99:,.1f} not shown)" if len(clipped) < len(dff) else ""
+
         fig = px.histogram(
-            dff.to_frame(),
-            x=col,
-            nbins=30,
-            title=f"Distribution of {friendly}",
+            clipped.to_frame(), x=col, nbins=30,
+            title=f"Distribution of {friendly}{note}",
             labels={col: friendly, "count": "Number of Records"},
             color_discrete_sequence=["#06b6d4"],
         )
@@ -259,18 +323,17 @@ def build_charts(df: pd.DataFrame) -> dict:
         )
         charts[f"distribution_{i + 1}_{col}"] = safe_fig(fig)
 
-    # --- 3. Top categories for categorical columns (up to 2) ---
-    cat_interest = _pick_interesting_cat_cols(df, max_cols=2)
-    for i, col in enumerate(cat_interest):
+    # -----------------------------------------------------------------------
+    # 4. Top categories for categorical columns (up to 2)
+    # -----------------------------------------------------------------------
+    for i, col in enumerate(_pick_interesting_cat_cols(df, max_cols=2)):
         counts = df[col].dropna().value_counts().head(15).reset_index()
         counts.columns = [col, "count"]
         if counts.empty:
             continue
         friendly = _friendly_col_name(col)
         fig = px.bar(
-            counts,
-            x=col,
-            y="count",
+            counts, x=col, y="count",
             title=f"Record Count by {friendly}",
             labels={col: friendly, "count": "Number of Records"},
             color_discrete_sequence=["#06b6d4"],
@@ -278,42 +341,39 @@ def build_charts(df: pd.DataFrame) -> dict:
         fig.update_layout(
             xaxis_title=friendly,
             yaxis_title="Number of Records",
-            margin={"l": 10, "r": 10, "t": 50, "b": 60},
+            xaxis_tickangle=-30,
+            margin={"l": 10, "r": 10, "t": 50, "b": 80},
         )
         charts[f"breakdown_{i + 1}_{col}"] = safe_fig(fig)
 
     return charts
 
 
-# -------------------------
-# Extract Filters
-# -------------------------
+# ---------------------------------------------------------------------------
+# Filters
+# ---------------------------------------------------------------------------
+
 def extract_filters(df: pd.DataFrame) -> dict:
-    filters = {}
-    for col in df.select_dtypes(include=["object"]).columns:
-        unique_vals = sorted(df[col].dropna().unique().tolist())
-        if 2 <= len(unique_vals) <= 50:
-            filters[col] = unique_vals
-    return filters
+    return {
+        col: sorted(df[col].dropna().unique().tolist())
+        for col in df.select_dtypes(include=["object"]).columns
+        if 2 <= df[col].nunique(dropna=True) <= 50
+    }
 
 
-# -------------------------
-# Apply Filters
-# -------------------------
 def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
-    filtered_df = df.copy()
+    filtered = df.copy()
     for key, val in (filters or {}).items():
-        if key not in filtered_df.columns:
+        if key not in filtered.columns or val in [None, "", "all"]:
             continue
-        if val in [None, "", "all"]:
-            continue
-        filtered_df = filtered_df[filtered_df[key] == val]
-    return filtered_df
+        filtered = filtered[filtered[key] == val]
+    return filtered
 
 
-# -------------------------
-# Full Insights Pipeline
-# -------------------------
+# ---------------------------------------------------------------------------
+# Full insights pipeline
+# ---------------------------------------------------------------------------
+
 def generate_insights(blob_path: str, filters: dict = None) -> dict:
     df = load_file_from_blob(blob_path)
 
@@ -322,18 +382,15 @@ def generate_insights(blob_path: str, filters: dict = None) -> dict:
 
     df_for_charts = df.head(MAX_ROWS_FOR_CHARTS)
 
-    # AI summary is optional — omit rather than blocking on failure
-    ai_summary = generate_ai_summary(df_for_charts)
-
     result = {
-        "kpis": compute_kpis(df),
-        "charts": build_charts(df_for_charts),
-        "filters": extract_filters(df),
-        "ai_summary": ai_summary,
+        "kpis":      compute_kpis(df),
+        "charts":    build_charts(df_for_charts),
+        "filters":   extract_filters(df),
+        "ai_summary": generate_ai_summary(df_for_charts),
         "debug": {
-            "version": "insights_py_2026-04-03_v3",
-            "rows": int(df.shape[0]),
-            "cols": int(df.shape[1]),
+            "version":              "insights_py_2026-04-03_v4",
+            "rows":                 int(df.shape[0]),
+            "cols":                 int(df.shape[1]),
             "rows_used_for_charts": int(df_for_charts.shape[0]),
         },
     }
