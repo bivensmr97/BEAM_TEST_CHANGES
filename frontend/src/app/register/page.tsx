@@ -28,10 +28,10 @@ export default function RegisterPage() {
     <main className="flex min-h-screen items-center justify-center bg-[var(--bg-main)]">
       <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] p-8 shadow-xl">
         <h1 className="mb-2 text-2xl font-semibold text-[var(--text-main)]">
-          Create your tenant
+          Create your account
         </h1>
         <p className="mb-6 text-sm text-[var(--text-muted)]">
-          Register a new tenant and your admin account.
+          Set up BEAM Analytics for your company.
         </p>
 
         {error && (
@@ -44,7 +44,7 @@ export default function RegisterPage() {
           {/* Tenant name */}
           <div>
             <label className="mb-1 block text-sm text-[var(--text-main)]">
-              Tenant name
+              Company name
             </label>
             <input
               type="text"
@@ -89,7 +89,7 @@ export default function RegisterPage() {
             disabled={loading}
             className="mt-2 w-full rounded-md bg-cyan-500 px-3 py-2 text-sm font-semibold text-[var(--dark-text)] hover:bg-cyan-400 disabled:opacity-60"
           >
-            {loading ? "Creating tenant..." : "Create tenant"}
+            {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
 

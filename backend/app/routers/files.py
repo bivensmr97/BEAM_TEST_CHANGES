@@ -2,10 +2,14 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional, Dict, Any
 from uuid import uuid4, UUID
 from datetime import datetime
 import re
+import math
+import io
+import pandas as pd
+import numpy as np
 from urllib.parse import quote
 
 from azure.storage.blob import BlobServiceClient
@@ -14,12 +18,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.deps import get_db
 from app.auth import get_current_user
-from app.models import File as FileModel, User 
-
-import io
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, Optional
+from app.models import File as FileModel, User
 
 router = APIRouter()
 
@@ -27,6 +26,15 @@ settings = get_settings()
 blob_service = BlobServiceClient.from_connection_string(settings.AZURE_BLOB_CONNSTRING)
 container_client = blob_service.get_container_client(settings.BLOB_CONTAINER)
 
+# ---------------------------------------------------------------------------
+# Upload size limit — 50 MB
+# ---------------------------------------------------------------------------
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+
+# ---------------------------------------------------------------------------
+# Response models
+# ---------------------------------------------------------------------------
 
 class FileOut(BaseModel):
     id: UUID
@@ -38,9 +46,11 @@ class FileOut(BaseModel):
     class Config:
         orm_mode = True
 
+
 class TopValue(BaseModel):
     value: str
     count: int
+
 
 class ColumnInsight(BaseModel):
     name: str
@@ -49,24 +59,133 @@ class ColumnInsight(BaseModel):
     distinct_count: int
     top_values: list[TopValue] = []
 
+
 class InsightsOut(BaseModel):
     summary: str
     columns: list[ColumnInsight]
 
+
 class IssueOut(BaseModel):
     key: str
-    severity: str  # "low" | "med" | "high"
-    message: str
+    severity: str          # "critical" | "warning" | "info"
+    title: str
+    plain_message: str     # plain English, no jargon
+    recommendation: str    # plain English next step
+
+
+class ColumnHealthDetail(BaseModel):
+    name: str
+    null_rate: float
+    null_count: int
+    distinct_count: int
+    total_count: int
+    inferred_type: str
+    # numeric-only fields (None for non-numeric)
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    mean_value: Optional[float] = None
+    median_value: Optional[float] = None
+    std_dev: Optional[float] = None
+    outlier_count: Optional[int] = None
+    # text/categorical
+    top_values: list[TopValue] = []
+
 
 class HealthOut(BaseModel):
     score: float
     grade: str
+    score_label: str          # plain-language label for the score
     category_scores: Dict[str, float]
+    category_labels: Dict[str, str]   # plain-language per-dimension names
     issues: list[IssueOut]
+    column_details: list[ColumnHealthDetail]
+    total_rows: int
+    total_columns: int
+    duplicate_count: int
+
 
 class HealthIn(BaseModel):
-    yaml_config: Optional[str] = None 
+    yaml_config: Optional[str] = None
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _content_disposition_attachment(filename: str) -> str:
+    """Build a safe Content-Disposition header (RFC 5987)."""
+    name = filename or "download"
+    name = re.sub(r"[\r\n]", " ", name).replace('"', "")
+    fallback = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip() or "download"
+    encoded = quote(name, safe="")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
+
+
+def _load_dataframe_from_blob(file: FileModel) -> pd.DataFrame:
+    """Download a file from Azure Blob and parse it into a DataFrame.
+
+    Handles CSV encoding fallback (UTF-8 → Latin-1) and strips
+    fully-empty rows/columns that are common in spreadsheet exports.
+    """
+    blob_client = container_client.get_blob_client(file.blob_path)
+    data = blob_client.download_blob().readall()
+
+    name_lc = (file.original_name or "").lower()
+    if name_lc.endswith(".csv"):
+        try:
+            df = pd.read_csv(io.BytesIO(data))
+        except UnicodeDecodeError:
+            df = pd.read_csv(io.BytesIO(data), encoding="latin-1")
+    elif name_lc.endswith(".xlsx") or name_lc.endswith(".xls"):
+        df = pd.read_excel(io.BytesIO(data))
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file type for parsing")
+
+    # Drop fully empty rows/columns (common in Excel exports)
+    df = df.dropna(how="all").dropna(axis=1, how="all")
+    # Normalize column names
+    df.columns = [str(c).strip() for c in df.columns]
+    # Replace infinities with NaN so all downstream math is safe
+    df = df.replace([np.inf, -np.inf], np.nan)
+    return df
+
+
+def _safe_float(v) -> Optional[float]:
+    """Return None if the value is NaN or infinite, otherwise a Python float."""
+    try:
+        f = float(v)
+        return None if (math.isnan(f) or math.isinf(f)) else round(f, 4)
+    except (TypeError, ValueError):
+        return None
+
+
+def _score_label(score: float) -> str:
+    if score >= 90:
+        return "Excellent — your data is in great shape"
+    if score >= 80:
+        return "Good — minor issues worth reviewing"
+    if score >= 70:
+        return "Fair — several issues that should be addressed"
+    if score >= 60:
+        return "Poor — significant data problems found"
+    return "Critical — urgent data quality issues require attention"
+
+
+def _grade(score: float) -> str:
+    if score >= 90:
+        return "A"
+    if score >= 80:
+        return "B"
+    if score >= 70:
+        return "C"
+    if score >= 60:
+        return "D"
+    return "F"
+
+
+# ---------------------------------------------------------------------------
+# File upload / list / get / download
+# ---------------------------------------------------------------------------
 
 @router.post("/upload", response_model=FileOut)
 async def upload_file(
@@ -79,19 +198,25 @@ async def upload_file(
         "application/vnd.ms-excel",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ):
-        raise HTTPException(status_code=400, detail="Unsupported file type")
+        raise HTTPException(status_code=400, detail="Unsupported file type. Please upload a CSV or Excel file.")
+
+    data = await uploaded_file.read()
+
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File is too large. Maximum upload size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+        )
 
     file_id = str(uuid4())
     tenant_prefix = f"tenant_{user.tenant_id}/file_{file_id}"
     blob_path = f"{tenant_prefix}/raw/{uploaded_file.filename}"
 
-    data = await uploaded_file.read()
-
     try:
         blob_client = container_client.get_blob_client(blob_path)
         blob_client.upload_blob(data, overwrite=True)
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=f"Blob upload failed: {ex}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {ex}")
 
     db_file = FileModel(
         id=file_id,
@@ -108,7 +233,6 @@ async def upload_file(
     db.add(db_file)
     db.commit()
     db.refresh(db_file)
-
     return db_file
 
 
@@ -117,13 +241,12 @@ def list_files(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    files = (
+    return (
         db.query(FileModel)
         .filter(FileModel.tenant_id == user.tenant_id)
         .order_by(FileModel.uploaded_at.desc())
         .all()
     )
-    return files
 
 
 @router.get("/{file_id}", response_model=FileOut)
@@ -134,49 +257,12 @@ def get_file(
 ):
     file = (
         db.query(FileModel)
-        .filter(
-            FileModel.id == file_id,
-            FileModel.tenant_id == user.tenant_id,
-        )
+        .filter(FileModel.id == file_id, FileModel.tenant_id == user.tenant_id)
         .first()
     )
     if not file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-
     return file
-
-
-def _content_disposition_attachment(filename: str) -> str:
-    """Build a safe Content-Disposition header value with RFC 5987 support.
-
-    We include both:
-      - filename="..." (ASCII-ish fallback)
-      - filename*=UTF-8''... (RFC 5987, full UTF-8)
-
-    This is widely supported by modern browsers and should not break older ones.
-    """
-    name = filename or "download"
-    # Strip CR/LF and quotes to avoid header injection / broken headers.
-    name = re.sub(r"[\r\n]", " ", name).replace('"', "")
-
-    # ASCII fallback: keep common safe chars, replace others with underscore.
-    fallback = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip() or "download"
-
-    # RFC 5987 encoding for UTF-8 filenames
-    encoded = quote(name, safe="")
-
-    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
-
-def _load_dataframe_from_blob(file: FileModel) -> pd.DataFrame:
-    blob_client = container_client.get_blob_client(file.blob_path)
-    data = blob_client.download_blob().readall()
-
-    name_lc = (file.original_name or "").lower()
-    if name_lc.endswith(".csv"):
-        return pd.read_csv(io.BytesIO(data))
-    if name_lc.endswith(".xlsx") or name_lc.endswith(".xls"):
-        return pd.read_excel(io.BytesIO(data))
-    raise HTTPException(status_code=400, detail="Unsupported file type for parsing")
 
 
 @router.get("/{file_id}/download")
@@ -188,10 +274,7 @@ def download_file(
 ):
     file = (
         db.query(FileModel)
-        .filter(
-            FileModel.id == file_id,
-            FileModel.tenant_id == user.tenant_id,
-        )
+        .filter(FileModel.id == file_id, FileModel.tenant_id == user.tenant_id)
         .first()
     )
     if not file:
@@ -215,15 +298,17 @@ def download_file(
         else:
             media_type = "application/octet-stream"
 
-        headers = {
-            "Content-Disposition": _content_disposition_attachment(file.original_name),
-        }
-
+        headers = {"Content-Disposition": _content_disposition_attachment(file.original_name)}
         return StreamingResponse(stream(), media_type=media_type, headers=headers)
 
     except Exception as ex:
         raise HTTPException(status_code=500, detail=f"Download failed: {ex}")
-    
+
+
+# ---------------------------------------------------------------------------
+# GET /insights — lightweight column profile (unchanged shape)
+# ---------------------------------------------------------------------------
+
 @router.get("/{file_id}/insights", response_model=InsightsOut)
 def file_insights(
     file_id: str,
@@ -246,7 +331,6 @@ def file_insights(
         null_rate = float(s.isna().mean())
         distinct_count = int(s.nunique(dropna=True))
 
-        inferred = "unknown"
         if pd.api.types.is_numeric_dtype(s):
             inferred = "numeric"
         elif pd.api.types.is_datetime64_any_dtype(s):
@@ -271,9 +355,13 @@ def file_insights(
             )
         )
 
-    summary = f"{df.shape[0]} rows × {df.shape[1]} columns"
-
+    summary = f"{df.shape[0]:,} rows × {df.shape[1]} columns"
     return InsightsOut(summary=summary, columns=cols)
+
+
+# ---------------------------------------------------------------------------
+# POST /health — full data health diagnostic
+# ---------------------------------------------------------------------------
 
 @router.post("/{file_id}/health", response_model=HealthOut)
 def file_health(
@@ -292,77 +380,313 @@ def file_health(
 
     df = _load_dataframe_from_blob(file)
 
+    n_rows = len(df)
+    n_cols = len(df.columns)
     issues: list[IssueOut] = []
+    column_details: list[ColumnHealthDetail] = []
 
-    # --- Basic checks (MVP) ---
-    missingness = float(df.isna().mean().mean()) if df.shape[1] else 0.0
-    dup_rate = float(df.duplicated().mean()) if df.shape[0] else 0.0
+    if n_rows == 0:
+        raise HTTPException(status_code=422, detail="The uploaded file contains no data rows.")
 
-    # crude type parsing issues: count object cols that look numeric but aren't
-    parse_issues = 0.0
+    # -----------------------------------------------------------------------
+    # 1. COMPLETENESS — per-column null analysis
+    # -----------------------------------------------------------------------
+    null_counts = df.isna().sum()
+    null_rates = df.isna().mean()
+    overall_null_rate = float(null_rates.mean())
+
+    # Columns with meaningful missingness
+    missing_cols = [(c, float(null_rates[c]), int(null_counts[c]))
+                    for c in df.columns if null_rates[c] > 0]
+    missing_cols.sort(key=lambda x: x[1], reverse=True)
+
+    if overall_null_rate > 0.20:
+        issues.append(IssueOut(
+            key="completeness",
+            severity="critical",
+            title="Large amounts of missing information",
+            plain_message=(
+                f"On average, {overall_null_rate:.0%} of values across your dataset are empty. "
+                f"That means roughly {int(overall_null_rate * n_rows * n_cols):,} cells have no data. "
+                f"The worst affected fields are: {', '.join(c for c, _, _ in missing_cols[:3])}."
+            ),
+            recommendation=(
+                "Review your data entry process for the fields listed above. "
+                "Missing information can cause incorrect reports and missed communications."
+            ),
+        ))
+    elif overall_null_rate > 0.05:
+        worst = missing_cols[0] if missing_cols else None
+        issues.append(IssueOut(
+            key="completeness",
+            severity="warning",
+            title="Some fields have missing information",
+            plain_message=(
+                f"About {overall_null_rate:.0%} of cells are empty across your dataset. "
+                + (f"The field '{worst[0]}' is the most incomplete, with {worst[1]:.0%} of its values missing ({worst[2]:,} records)." if worst else "")
+            ),
+            recommendation=(
+                "Check which fields are consistently left blank and consider making them required in your data entry system."
+            ),
+        ))
+    elif overall_null_rate > 0:
+        issues.append(IssueOut(
+            key="completeness",
+            severity="info",
+            title="A small number of empty fields",
+            plain_message=f"Less than {overall_null_rate:.1%} of cells are empty — this is generally fine.",
+            recommendation="No action required, but worth periodically reviewing your most important fields.",
+        ))
+
+    completeness_score = max(0.0, min(100.0, 100.0 - (overall_null_rate * 200.0)))
+
+    # -----------------------------------------------------------------------
+    # 2. UNIQUENESS — duplicate row detection
+    # -----------------------------------------------------------------------
+    dup_mask = df.duplicated(keep=False)
+    duplicate_count = int(dup_mask.sum())
+    dup_rate = duplicate_count / n_rows if n_rows > 0 else 0.0
+
+    if dup_rate > 0.10:
+        issues.append(IssueOut(
+            key="uniqueness",
+            severity="critical",
+            title="Many duplicate records found",
+            plain_message=(
+                f"We found {duplicate_count:,} duplicate rows out of {n_rows:,} total records "
+                f"({dup_rate:.0%} of your data). Duplicate records can cause inflated counts, "
+                f"double-billing, and misleading reports."
+            ),
+            recommendation=(
+                "Remove or merge duplicate records. Determine whether your data source is sending "
+                "the same records multiple times and fix the export process."
+            ),
+        ))
+    elif dup_rate > 0.01:
+        issues.append(IssueOut(
+            key="uniqueness",
+            severity="warning",
+            title="Duplicate records detected",
+            plain_message=(
+                f"We found {duplicate_count:,} duplicate rows in your dataset ({dup_rate:.1%} of records). "
+                f"Small numbers of duplicates are common but worth reviewing."
+            ),
+            recommendation=(
+                "Review the duplicate records to confirm they are true duplicates (not separate events "
+                "that happen to look the same). Remove confirmed duplicates."
+            ),
+        ))
+
+    uniqueness_score = max(0.0, min(100.0, 100.0 - (dup_rate * 300.0)))
+
+    # -----------------------------------------------------------------------
+    # 3. VALIDITY — type conformance and format checks
+    # -----------------------------------------------------------------------
+    validity_issues_found = []
+
     for c in df.columns:
         s = df[c]
-        if s.dtype == "object":
-            sample = s.dropna().astype(str).head(200)
-            if len(sample) == 0:
-                continue
-            # if many values contain digits and commas, attempt numeric coercion
-            coerced = pd.to_numeric(sample.str.replace(",", "", regex=False), errors="coerce")
-            # if a lot of coercion failed but values "look numeric", flag it
-            looks_numeric = sample.str.match(r"^[\d,.\-]+$").mean()
-            fail_rate = float(coerced.isna().mean())
-            if looks_numeric > 0.6 and fail_rate > 0.2:
-                parse_issues += 1
+        if s.dtype != object:
+            continue
 
-    parse_rate = float(parse_issues / max(1, len(df.columns)))
+        non_null = s.dropna()
+        if len(non_null) == 0:
+            continue
 
-    # outliers: for numeric columns, check % beyond 3 std (simple)
-    outlier_rates = []
+        sample = non_null.astype(str).head(500)
+
+        # Check: column appears to be numeric but stored as text
+        coerced = pd.to_numeric(sample.str.replace(",", "", regex=False), errors="coerce")
+        looks_numeric = float(sample.str.match(r"^[\d,.\-\s]+$").mean())
+        fail_rate = float(coerced.isna().mean())
+        if looks_numeric > 0.7 and fail_rate > 0.15:
+            validity_issues_found.append(
+                f"'{c}' looks like a number column but contains text values"
+            )
+            continue
+
+        # Check: possible date column stored as text
+        date_pattern = r"^\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4}$"
+        looks_like_date = float(sample.str.match(date_pattern).mean())
+        if looks_like_date > 0.7:
+            try:
+                parsed = pd.to_datetime(sample, errors="coerce", infer_datetime_format=True)
+                if parsed.isna().mean() > 0.3:
+                    validity_issues_found.append(
+                        f"'{c}' looks like a date column but has inconsistent date formats"
+                    )
+            except Exception:
+                pass
+
+        # Check: possible email column
+        if any(kw in c.lower() for kw in ("email", "e-mail", "mail")):
+            email_pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+            invalid_rate = float((~sample.str.match(email_pattern, na=True)).mean())
+            if invalid_rate > 0.05:
+                validity_issues_found.append(
+                    f"'{c}' contains {invalid_rate:.0%} values that don't look like valid email addresses"
+                )
+
+    parse_rate = len(validity_issues_found) / max(1, n_cols)
+
+    if validity_issues_found:
+        severity = "critical" if parse_rate > 0.3 else "warning"
+        issues.append(IssueOut(
+            key="validity",
+            severity=severity,
+            title="Some fields have formatting problems",
+            plain_message=(
+                f"We found {len(validity_issues_found)} field(s) where the data doesn't match "
+                f"the expected format: {'; '.join(validity_issues_found[:4])}."
+            ),
+            recommendation=(
+                "Review the listed fields. Formatting problems often mean data was entered or exported "
+                "incorrectly. Fix the source data or standardize the format before using this dataset."
+            ),
+        ))
+
+    validity_score = max(0.0, min(100.0, 100.0 - (parse_rate * 200.0)))
+
+    # -----------------------------------------------------------------------
+    # 4. DISTRIBUTION — outlier detection per numeric column
+    # -----------------------------------------------------------------------
+    outlier_details = []
     numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    total_outlier_count = 0
+
     for c in numeric_cols:
         s = df[c].dropna()
         if len(s) < 20:
             continue
-        mu = float(s.mean())
-        sd = float(s.std()) or 0.0
-        if sd == 0.0:
+        q1 = float(s.quantile(0.25))
+        q3 = float(s.quantile(0.75))
+        iqr = q3 - q1
+        if iqr == 0:
             continue
-        outlier_rates.append(float(((np.abs(s - mu) > 3 * sd)).mean()))
-    outlier_rate = float(np.mean(outlier_rates)) if outlier_rates else 0.0
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        outlier_mask = (s < lower) | (s > upper)
+        col_outlier_count = int(outlier_mask.sum())
+        total_outlier_count += col_outlier_count
+        if col_outlier_count > 0:
+            outlier_details.append((c, col_outlier_count, float(s[outlier_mask].abs().max())))
 
-    # --- Category scores (0-100) ---
-    def score_from_rate(rate: float) -> float:
-        # 0 rate => 100 score; 50% rate => 0 score (clamp)
-        return float(max(0.0, min(100.0, 100.0 * (1.0 - (rate * 2.0)))))
+    outlier_rate = total_outlier_count / max(1, n_rows * max(1, len(numeric_cols)))
 
-    category_scores = {
-        "missingness": score_from_rate(missingness),
-        "duplicates": score_from_rate(dup_rate),
-        "parsing": score_from_rate(parse_rate),
-        "outliers": score_from_rate(outlier_rate),
+    if outlier_details and outlier_rate > 0.05:
+        top_outlier_cols = sorted(outlier_details, key=lambda x: x[1], reverse=True)[:3]
+        issues.append(IssueOut(
+            key="distribution",
+            severity="warning",
+            title="Unusually high or low values detected",
+            plain_message=(
+                f"We found {total_outlier_count:,} values that are far outside the normal range "
+                f"for their column. The most affected fields are: "
+                f"{', '.join(f'{c} ({n:,} values)' for c, n, _ in top_outlier_cols)}. "
+                f"These could be data entry errors or legitimate extreme cases."
+            ),
+            recommendation=(
+                "Review the flagged values in the listed fields. Decide whether they are real "
+                "data points or mistakes. Errors should be corrected in your source system."
+            ),
+        ))
+    elif outlier_details:
+        issues.append(IssueOut(
+            key="distribution",
+            severity="info",
+            title="A few unusual values found",
+            plain_message=(
+                f"We found a small number of values ({total_outlier_count:,}) that fall outside "
+                f"the normal range. This is often fine but worth a quick check."
+            ),
+            recommendation="Spot-check the highest and lowest values in your numeric fields to confirm they are correct.",
+        ))
+
+    distribution_score = max(0.0, min(100.0, 100.0 - (outlier_rate * 300.0)))
+
+    # -----------------------------------------------------------------------
+    # 5. WEIGHTED OVERALL SCORE
+    # Weights reflect business importance: completeness and uniqueness matter most
+    # -----------------------------------------------------------------------
+    weights = {
+        "completeness": 0.35,
+        "uniqueness": 0.30,
+        "validity": 0.20,
+        "distribution": 0.15,
     }
+    raw_scores = {
+        "completeness": completeness_score,
+        "uniqueness": uniqueness_score,
+        "validity": validity_score,
+        "distribution": distribution_score,
+    }
+    overall_score = sum(raw_scores[k] * weights[k] for k in weights)
+    overall_score = round(overall_score, 1)
 
-    score = float(np.mean(list(category_scores.values())))
+    # -----------------------------------------------------------------------
+    # 6. PER-COLUMN DETAIL RECORDS
+    # -----------------------------------------------------------------------
+    outlier_map = {c: n for c, n, _ in outlier_details}
 
-    if score >= 90:
-        grade = "A"
-    elif score >= 80:
-        grade = "B"
-    elif score >= 70:
-        grade = "C"
-    elif score >= 60:
-        grade = "D"
-    else:
-        grade = "F"
+    for c in df.columns:
+        s = df[c]
+        is_numeric = pd.api.types.is_numeric_dtype(s)
+        is_datetime = pd.api.types.is_datetime64_any_dtype(s)
 
-    # --- Issues list ---
-    if missingness > 0.05:
-        issues.append(IssueOut(key="missingness", severity="med", message=f"Overall missingness is {missingness:.1%}."))
-    if dup_rate > 0.01:
-        issues.append(IssueOut(key="duplicates", severity="med", message=f"Duplicate row rate is {dup_rate:.1%}."))
-    if parse_issues > 0:
-        issues.append(IssueOut(key="parsing", severity="low", message="Some columns appear numeric but contain non-numeric values."))
-    if outlier_rate > 0.02:
-        issues.append(IssueOut(key="outliers", severity="low", message=f"Numeric outlier rate (3σ rule) is {outlier_rate:.1%}."))
+        if is_numeric:
+            inferred_type = "numeric"
+        elif is_datetime:
+            inferred_type = "datetime"
+        else:
+            inferred_type = "text"
 
-    return HealthOut(score=score, grade=grade, category_scores=category_scores, issues=issues)
+        top_values: list[TopValue] = []
+        try:
+            vc = s.dropna().astype(str).value_counts().head(5)
+            top_values = [TopValue(value=k, count=int(v)) for k, v in vc.items()]
+        except Exception:
+            top_values = []
+
+        detail = ColumnHealthDetail(
+            name=str(c),
+            null_rate=round(float(null_rates[c]), 4),
+            null_count=int(null_counts[c]),
+            distinct_count=int(s.nunique(dropna=True)),
+            total_count=n_rows,
+            inferred_type=inferred_type,
+            outlier_count=outlier_map.get(c),
+            top_values=top_values,
+        )
+
+        if is_numeric:
+            non_null = s.dropna()
+            detail.min_value = _safe_float(non_null.min())
+            detail.max_value = _safe_float(non_null.max())
+            detail.mean_value = _safe_float(non_null.mean())
+            detail.median_value = _safe_float(non_null.median())
+            detail.std_dev = _safe_float(non_null.std())
+
+        column_details.append(detail)
+
+    return HealthOut(
+        score=overall_score,
+        grade=_grade(overall_score),
+        score_label=_score_label(overall_score),
+        category_scores={
+            "completeness": round(completeness_score, 1),
+            "uniqueness": round(uniqueness_score, 1),
+            "validity": round(validity_score, 1),
+            "distribution": round(distribution_score, 1),
+        },
+        category_labels={
+            "completeness": "Complete Information",
+            "uniqueness": "No Duplicate Records",
+            "validity": "Correct Formatting",
+            "distribution": "Realistic Values",
+        },
+        issues=issues,
+        column_details=column_details,
+        total_rows=n_rows,
+        total_columns=n_cols,
+        duplicate_count=duplicate_count,
+    )
