@@ -1,0 +1,1348 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Data Health Report - timchant/supstore-dataset-2019-2022::superstore_dataset.csv</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    .kpi { display: flex; gap: 18px; margin-bottom: 18px; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px 14px; }
+    .row { display:flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+    .title { font-size: 16px; }
+    .meta { color: #333; font-size: 13px; }
+    .dot { padding: 0 6px; }
+    .block { margin-top: 8px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #fafafa; }
+    .pass { color: #0a7; font-weight: bold; }
+    .warn { color: #c80; font-weight: bold; }
+    .fail { color: #c00; font-weight: bold; }
+    code { background: #f6f6f6; padding: 1px 4px; border-radius: 4px; }
+    .pre { white-space: pre-wrap; margin: 8px 0 0 0; }
+    .tabs { display:flex; gap: 10px; margin: 18px 0; flex-wrap: wrap; }
+    .tabbtn { border: 1px solid #ddd; background: #fff; border-radius: 999px; padding: 8px 12px; cursor: pointer; }
+    .tabbtn.active { background: #f1f5ff; border-color: #cfd8ff; }
+    .tab { display:none; }
+    .tab.active { display:block; }
+    .filters { display:flex; gap:10px; align-items:center; margin: 10px 0 14px 0; flex-wrap: wrap; }
+    select { padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; }
+    input[type="text"] { padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; min-width: 240px; }
+    .muted { color:#666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Data Health Report</h1>
+  <p>
+    <b>Dataset:</b> timchant/supstore-dataset-2019-2022::superstore_dataset.csv<br>
+    <b>Run (UTC):</b> 2026-01-27T02:10:16.408703+00:00<br>
+    <b>Rows:</b> 9994 &nbsp;&nbsp; <b>Columns:</b> 19
+  </p>
+
+  <div class="kpi">
+    <div class="card"><div><b>Overall Score</b></div><div style="font-size:28px">97.4</div></div>
+    <div class="card"><div><b>Grade</b></div><div style="font-size:28px">A</div></div>
+    <div class='card'><div><b>Readiness</b></div><div style='font-size:18px'>Ready for analytics</div><div class='muted'>Plain-English assessment</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tabbtn active" data-tab="summary">Summary</button>
+    <button class="tabbtn" data-tab="checks">Checks</button>
+    <button class="tabbtn" data-tab="profile">Profile</button>
+    <button class="tabbtn" data-tab="raw">Raw JSON</button>
+  </div>
+
+  <div id="tab-summary" class="tab active">
+    <h2>Category Scores</h2>
+    <table>
+      <tr><th>Category</th><th>Score</th></tr>
+      <tr><td>completeness</td><td>100.0</td></tr><tr><td>validity</td><td>87.1</td></tr><tr><td>uniqueness</td><td>100.0</td></tr><tr><td>consistency</td><td>100.0</td></tr><tr><td>integrity</td><td>100.0</td></tr><tr><td>timeliness</td><td>100.0</td></tr><tr><td>drift</td><td>100.0</td></tr>
+    </table>
+
+    <h2 style="margin-top:18px;">Top issues</h2>
+    <ul><li><b>Needs attention:</b> Unusual numeric values (possible outliers) (score 74.3)</li></ul>
+
+    <h2 style="margin-top:18px;">What to look at next</h2>
+    
+            <div class="card" style="margin-bottom:12px;">
+              <div class="row">
+                <div class="title"><b>Unusual numeric values (possible outliers)</b></div>
+                <div class="meta">
+                  <span class="warn">
+                    Needs attention
+                  </span>
+                  <span class="dot">·</span>
+                  Impact: Medium
+                  
+                </div>
+              </div>
+              <div class="block"><b>What we found:</b> Some numeric fields have many unusual values. Highest rate is 18.8%.</div>
+              <div class="block"><b>Why it matters:</b> This can indicate unit issues or valid skew (prices/amounts). Either way it affects averages and models.</div>
+              <div class='block'><b>Where to look:</b> profit (18.8%), sales (11.7%), profit_margin (9.5%)</div>
+              <div class='block'><b>What to do next:</b><ul><li>Spot-check top fields for unit/format problems (cents vs dollars).</li><li>If valid but skewed, consider medians/robust stats in dashboards.</li><li>Use config to tighten/loosen thresholds or exclude columns.</li></ul></div>
+            </div>
+            
+  </div>
+
+  <div id="tab-checks" class="tab">
+    <h2>All checks</h2>
+    <div class="filters">
+      <label class="muted">Filter:</label>
+      <select id="statusFilter">
+        <option value="all">All</option>
+        <option value="fail">Action needed</option>
+        <option value="warn">Needs attention</option>
+        <option value="pass">Pass</option>
+      </select>
+      <label class="muted">Search:</label>
+      <input id="searchBox" type="text" placeholder="e.g., null, outlier, key, parse..." />
+      <span class="muted">Tip: click “View” to expand details</span>
+    </div>
+
+    <table id="checksTable">
+      <tr>
+        <th>Status</th><th>Category</th><th>Check</th><th>Score</th><th>Severity</th><th>Recommendation</th><th>Details</th>
+      </tr>
+      
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>completeness</td>
+          <td><code title="null_rates">Missing values</code></td>
+          <td>100.0</td>
+          <td>medium</td>
+          <td>Investigate source/system gaps; consider imputation only after root-cause review.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.05,
+  &quot;threshold_fail&quot;: 0.1,
+  &quot;worst_null_rate&quot;: 0.0,
+  &quot;warn_columns&quot;: [],
+  &quot;fail_columns&quot;: []
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>completeness</td>
+          <td><code title="empty_strings">Blank text values</code></td>
+          <td>100.0</td>
+          <td>medium</td>
+          <td>Trim strings and normalize blanks to NULL; fix upstream exporters where possible.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.02,
+  &quot;threshold_fail&quot;: 0.05,
+  &quot;worst_empty_string_rate&quot;: 0.0,
+  &quot;warn_columns&quot;: [],
+  &quot;fail_columns&quot;: []
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>validity</td>
+          <td><code title="parse_failures">Numbers/dates that don&#x27;t parse cleanly</code></td>
+          <td>100.0</td>
+          <td>medium</td>
+          <td>Normalize formats upstream; enforce schema contracts or robust parsing before analytics.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.01,
+  &quot;threshold_fail&quot;: 0.03,
+  &quot;worst_parse_failure_rate&quot;: 0.0,
+  &quot;warn_columns&quot;: [],
+  &quot;fail_columns&quot;: []
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="warn">
+          <td class="warn">warn</td>
+          <td>validity</td>
+          <td><code title="numeric_outliers_iqr">Unusual numeric values (possible outliers)</code></td>
+          <td>74.3</td>
+          <td>medium</td>
+          <td>High outlier rates are common in money/count data. Spot-check units (cents vs dollars), then decide whether to use robust stats (medians), winsorization, or config exclusions.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.02,
+  &quot;threshold_fail&quot;: 0.05,
+  &quot;worst_outlier_rate&quot;: 0.188212927756654,
+  &quot;top_outlier_columns&quot;: [
+    [
+      &quot;profit&quot;,
+      0.188212927756654
+    ],
+    [
+      &quot;sales&quot;,
+      0.11677006203722233
+    ],
+    [
+      &quot;profit_margin&quot;,
+      0.09525715429257554
+    ],
+    [
+      &quot;discount&quot;,
+      0.0856513908345007
+    ],
+    [
+      &quot;quantity&quot;,
+      0.017010206123674206
+    ],
+    [
+      &quot;zip&quot;,
+      0.0
+    ]
+  ],
+  &quot;heavy_tail_flags&quot;: {
+    &quot;discount&quot;: [
+      &quot;tail_spread_ratio=inf&gt;10&quot;
+    ],
+    &quot;profit&quot;: [
+      &quot;skew=7.56&gt;2&quot;,
+      &quot;p99/p50=67.0&gt;10&quot;,
+      &quot;tail_spread_ratio=27.6&gt;10&quot;
+    ],
+    &quot;sales&quot;: [
+      &quot;skew=12.97&gt;2&quot;,
+      &quot;p99/p50=45.5&gt;10&quot;,
+      &quot;tail_spread_ratio=15.6&gt;10&quot;
+    ]
+  },
+  &quot;strict_fail&quot;: false
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>uniqueness</td>
+          <td><code title="duplicate_rows">Duplicate rows</code></td>
+          <td>100.0</td>
+          <td>medium</td>
+          <td>Identify duplicate-producing joins or reprocessing; dedupe using stable keys where appropriate.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;duplicate_row_rate&quot;: 0.00020012007204322593,
+  &quot;threshold_warn&quot;: 0.01,
+  &quot;threshold_fail&quot;: 0.03,
+  &quot;sampled&quot;: false,
+  &quot;sample_size&quot;: null
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+    </table>
+  </div>
+
+  <div id="tab-profile" class="tab">
+    <h2>Quick profile</h2>
+
+    <p class="muted">
+      Profile sampled: <b>False</b>
+    </p>
+
+    <h3>Most missing fields (top 15)</h3>
+    <table>
+      <tr><th>Column</th><th>Missing</th></tr>
+      <tr><td>order_id</td><td>0.0%</td></tr><tr><td>order_date</td><td>0.0%</td></tr><tr><td>ship_date</td><td>0.0%</td></tr><tr><td>customer</td><td>0.0%</td></tr><tr><td>manufactory</td><td>0.0%</td></tr><tr><td>product_name</td><td>0.0%</td></tr><tr><td>segment</td><td>0.0%</td></tr><tr><td>category</td><td>0.0%</td></tr><tr><td>subcategory</td><td>0.0%</td></tr><tr><td>region</td><td>0.0%</td></tr><tr><td>zip</td><td>0.0%</td></tr><tr><td>city</td><td>0.0%</td></tr><tr><td>state</td><td>0.0%</td></tr><tr><td>country</td><td>0.0%</td></tr><tr><td>discount</td><td>0.0%</td></tr>
+    </table>
+
+    <h3 style="margin-top:16px;">Columns overview (first 30)</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Distinct</th><th>Missing</th></tr>
+      <tr><td>order_id</td><td>string</td><td>5009</td><td>0.0%</td></tr><tr><td>order_date</td><td>date</td><td>1236</td><td>0.0%</td></tr><tr><td>ship_date</td><td>date</td><td>1334</td><td>0.0%</td></tr><tr><td>customer</td><td>string</td><td>793</td><td>0.0%</td></tr><tr><td>manufactory</td><td>category</td><td>182</td><td>0.0%</td></tr><tr><td>product_name</td><td>string</td><td>1849</td><td>0.0%</td></tr><tr><td>segment</td><td>category</td><td>3</td><td>0.0%</td></tr><tr><td>category</td><td>category</td><td>3</td><td>0.0%</td></tr><tr><td>subcategory</td><td>category</td><td>17</td><td>0.0%</td></tr><tr><td>region</td><td>category</td><td>4</td><td>0.0%</td></tr><tr><td>zip</td><td>number</td><td>631</td><td>0.0%</td></tr><tr><td>city</td><td>string</td><td>531</td><td>0.0%</td></tr><tr><td>state</td><td>category</td><td>49</td><td>0.0%</td></tr><tr><td>country</td><td>category</td><td>1</td><td>0.0%</td></tr><tr><td>discount</td><td>number</td><td>12</td><td>0.0%</td></tr><tr><td>profit</td><td>number</td><td>7287</td><td>0.0%</td></tr><tr><td>quantity</td><td>number</td><td>14</td><td>0.0%</td></tr><tr><td>sales</td><td>number</td><td>5825</td><td>0.0%</td></tr><tr><td>profit_margin</td><td>number</td><td>288</td><td>0.0%</td></tr>
+    </table>
+
+    <details style="margin-top:14px;">
+      <summary>Show full profile JSON</summary>
+      <pre class="pre">{
+  &quot;profile_sampled&quot;: false,
+  &quot;inferred_types&quot;: {
+    &quot;order_id&quot;: &quot;string&quot;,
+    &quot;order_date&quot;: &quot;date&quot;,
+    &quot;ship_date&quot;: &quot;date&quot;,
+    &quot;customer&quot;: &quot;string&quot;,
+    &quot;manufactory&quot;: &quot;category&quot;,
+    &quot;product_name&quot;: &quot;string&quot;,
+    &quot;segment&quot;: &quot;category&quot;,
+    &quot;category&quot;: &quot;category&quot;,
+    &quot;subcategory&quot;: &quot;category&quot;,
+    &quot;region&quot;: &quot;category&quot;,
+    &quot;zip&quot;: &quot;number&quot;,
+    &quot;city&quot;: &quot;string&quot;,
+    &quot;state&quot;: &quot;category&quot;,
+    &quot;country&quot;: &quot;category&quot;,
+    &quot;discount&quot;: &quot;number&quot;,
+    &quot;profit&quot;: &quot;number&quot;,
+    &quot;quantity&quot;: &quot;number&quot;,
+    &quot;sales&quot;: &quot;number&quot;,
+    &quot;profit_margin&quot;: &quot;number&quot;
+  },
+  &quot;null_rate&quot;: {
+    &quot;order_id&quot;: 0.0,
+    &quot;order_date&quot;: 0.0,
+    &quot;ship_date&quot;: 0.0,
+    &quot;customer&quot;: 0.0,
+    &quot;manufactory&quot;: 0.0,
+    &quot;product_name&quot;: 0.0,
+    &quot;segment&quot;: 0.0,
+    &quot;category&quot;: 0.0,
+    &quot;subcategory&quot;: 0.0,
+    &quot;region&quot;: 0.0,
+    &quot;zip&quot;: 0.0,
+    &quot;city&quot;: 0.0,
+    &quot;state&quot;: 0.0,
+    &quot;country&quot;: 0.0,
+    &quot;discount&quot;: 0.0,
+    &quot;profit&quot;: 0.0,
+    &quot;quantity&quot;: 0.0,
+    &quot;sales&quot;: 0.0,
+    &quot;profit_margin&quot;: 0.0
+  },
+  &quot;empty_string_rate&quot;: {
+    &quot;order_id&quot;: 0.0,
+    &quot;order_date&quot;: 0.0,
+    &quot;ship_date&quot;: 0.0,
+    &quot;customer&quot;: 0.0,
+    &quot;manufactory&quot;: 0.0,
+    &quot;product_name&quot;: 0.0,
+    &quot;segment&quot;: 0.0,
+    &quot;category&quot;: 0.0,
+    &quot;subcategory&quot;: 0.0,
+    &quot;region&quot;: 0.0,
+    &quot;zip&quot;: 0.0,
+    &quot;city&quot;: 0.0,
+    &quot;state&quot;: 0.0,
+    &quot;country&quot;: 0.0,
+    &quot;discount&quot;: 0.0,
+    &quot;profit&quot;: 0.0,
+    &quot;quantity&quot;: 0.0,
+    &quot;sales&quot;: 0.0,
+    &quot;profit_margin&quot;: 0.0
+  },
+  &quot;distinct_count&quot;: {
+    &quot;order_id&quot;: 5009,
+    &quot;order_date&quot;: 1236,
+    &quot;ship_date&quot;: 1334,
+    &quot;customer&quot;: 793,
+    &quot;manufactory&quot;: 182,
+    &quot;product_name&quot;: 1849,
+    &quot;segment&quot;: 3,
+    &quot;category&quot;: 3,
+    &quot;subcategory&quot;: 17,
+    &quot;region&quot;: 4,
+    &quot;zip&quot;: 631,
+    &quot;city&quot;: 531,
+    &quot;state&quot;: 49,
+    &quot;country&quot;: 1,
+    &quot;discount&quot;: 12,
+    &quot;profit&quot;: 7287,
+    &quot;quantity&quot;: 14,
+    &quot;sales&quot;: 5825,
+    &quot;profit_margin&quot;: 288
+  },
+  &quot;numeric_stats&quot;: {
+    &quot;order_id&quot;: {},
+    &quot;order_date&quot;: {},
+    &quot;ship_date&quot;: {},
+    &quot;customer&quot;: {},
+    &quot;manufactory&quot;: {},
+    &quot;product_name&quot;: {},
+    &quot;segment&quot;: {},
+    &quot;category&quot;: {},
+    &quot;subcategory&quot;: {},
+    &quot;region&quot;: {},
+    &quot;zip&quot;: {
+      &quot;min&quot;: 1040.0,
+      &quot;max&quot;: 99301.0,
+      &quot;mean&quot;: 55190.37172303382,
+      &quot;std&quot;: 32063.705314666506,
+      &quot;p25&quot;: 23223.0,
+      &quot;p50&quot;: 56430.5,
+      &quot;p75&quot;: 90008.0
+    },
+    &quot;city&quot;: {},
+    &quot;state&quot;: {},
+    &quot;country&quot;: {},
+    &quot;discount&quot;: {
+      &quot;min&quot;: 0.0,
+      &quot;max&quot;: 0.8,
+      &quot;mean&quot;: 0.15620272163297977,
+      &quot;std&quot;: 0.20645196782569636,
+      &quot;p25&quot;: 0.0,
+      &quot;p50&quot;: 0.2,
+      &quot;p75&quot;: 0.2
+    },
+    &quot;profit&quot;: {
+      &quot;min&quot;: -6599.978,
+      &quot;max&quot;: 8399.976,
+      &quot;mean&quot;: 28.656896307784674,
+      &quot;std&quot;: 234.26010769095754,
+      &quot;p25&quot;: 1.72875,
+      &quot;p50&quot;: 8.6665,
+      &quot;p75&quot;: 29.364
+    },
+    &quot;quantity&quot;: {
+      &quot;min&quot;: 1.0,
+      &quot;max&quot;: 14.0,
+      &quot;mean&quot;: 3.789573744246548,
+      &quot;std&quot;: 2.2251096911414243,
+      &quot;p25&quot;: 2.0,
+      &quot;p50&quot;: 3.0,
+      &quot;p75&quot;: 5.0
+    },
+    &quot;sales&quot;: {
+      &quot;min&quot;: 0.444,
+      &quot;max&quot;: 22638.48,
+      &quot;mean&quot;: 229.85800083049827,
+      &quot;std&quot;: 623.245100508682,
+      &quot;p25&quot;: 17.28,
+      &quot;p50&quot;: 54.489999999999995,
+      &quot;p75&quot;: 209.94
+    },
+    &quot;profit_margin&quot;: {
+      &quot;min&quot;: -2.75,
+      &quot;max&quot;: 0.5,
+      &quot;mean&quot;: 0.12031392972173303,
+      &quot;std&quot;: 0.46675434522462733,
+      &quot;p25&quot;: 0.075,
+      &quot;p50&quot;: 0.27,
+      &quot;p75&quot;: 0.3625
+    }
+  },
+  &quot;top_values&quot;: {
+    &quot;order_id&quot;: [],
+    &quot;order_date&quot;: [],
+    &quot;ship_date&quot;: [],
+    &quot;customer&quot;: [
+      [
+        &quot;William Brown&quot;,
+        37
+      ],
+      [
+        &quot;Paul Prost&quot;,
+        34
+      ],
+      [
+        &quot;Matt Abelman&quot;,
+        34
+      ],
+      [
+        &quot;John Lee&quot;,
+        34
+      ],
+      [
+        &quot;Seth Vernon&quot;,
+        32
+      ]
+    ],
+    &quot;manufactory&quot;: [
+      [
+        &quot;Other&quot;,
+        1893
+      ],
+      [
+        &quot;Xerox&quot;,
+        859
+      ],
+      [
+        &quot;Avery&quot;,
+        557
+      ],
+      [
+        &quot;GBC&quot;,
+        332
+      ],
+      [
+        &quot;Global&quot;,
+        291
+      ]
+    ],
+    &quot;product_name&quot;: [
+      [
+        &quot;Staple envelope&quot;,
+        48
+      ],
+      [
+        &quot;Staples&quot;,
+        46
+      ],
+      [
+        &quot;Easy-staple paper&quot;,
+        46
+      ],
+      [
+        &quot;Avery Non-Stick Binders&quot;,
+        20
+      ],
+      [
+        &quot;Staples in misc. colors&quot;,
+        19
+      ]
+    ],
+    &quot;segment&quot;: [
+      [
+        &quot;Consumer&quot;,
+        5191
+      ],
+      [
+        &quot;Corporate&quot;,
+        3020
+      ],
+      [
+        &quot;Home Office&quot;,
+        1783
+      ]
+    ],
+    &quot;category&quot;: [
+      [
+        &quot;Office Supplies&quot;,
+        6026
+      ],
+      [
+        &quot;Furniture&quot;,
+        2121
+      ],
+      [
+        &quot;Technology&quot;,
+        1847
+      ]
+    ],
+    &quot;subcategory&quot;: [
+      [
+        &quot;Binders&quot;,
+        1523
+      ],
+      [
+        &quot;Paper&quot;,
+        1370
+      ],
+      [
+        &quot;Furnishings&quot;,
+        957
+      ],
+      [
+        &quot;Phones&quot;,
+        889
+      ],
+      [
+        &quot;Storage&quot;,
+        846
+      ]
+    ],
+    &quot;region&quot;: [
+      [
+        &quot;West&quot;,
+        3203
+      ],
+      [
+        &quot;East&quot;,
+        2848
+      ],
+      [
+        &quot;Central&quot;,
+        2323
+      ],
+      [
+        &quot;South&quot;,
+        1620
+      ]
+    ],
+    &quot;zip&quot;: [],
+    &quot;city&quot;: [
+      [
+        &quot;New York City&quot;,
+        915
+      ],
+      [
+        &quot;Los Angeles&quot;,
+        747
+      ],
+      [
+        &quot;Philadelphia&quot;,
+        537
+      ],
+      [
+        &quot;San Francisco&quot;,
+        510
+      ],
+      [
+        &quot;Seattle&quot;,
+        428
+      ]
+    ],
+    &quot;state&quot;: [
+      [
+        &quot;California&quot;,
+        2001
+      ],
+      [
+        &quot;New York&quot;,
+        1128
+      ],
+      [
+        &quot;Texas&quot;,
+        985
+      ],
+      [
+        &quot;Pennsylvania&quot;,
+        587
+      ],
+      [
+        &quot;Washington&quot;,
+        506
+      ]
+    ],
+    &quot;country&quot;: [
+      [
+        &quot;United States&quot;,
+        9994
+      ]
+    ],
+    &quot;discount&quot;: [],
+    &quot;profit&quot;: [],
+    &quot;quantity&quot;: [],
+    &quot;sales&quot;: [],
+    &quot;profit_margin&quot;: []
+  },
+  &quot;parse_failure_rate&quot;: {
+    &quot;order_id&quot;: 0.0,
+    &quot;order_date&quot;: 0.0,
+    &quot;ship_date&quot;: 0.0,
+    &quot;customer&quot;: 0.0,
+    &quot;manufactory&quot;: 0.0,
+    &quot;product_name&quot;: 0.0,
+    &quot;segment&quot;: 0.0,
+    &quot;category&quot;: 0.0,
+    &quot;subcategory&quot;: 0.0,
+    &quot;region&quot;: 0.0,
+    &quot;zip&quot;: 0.0,
+    &quot;city&quot;: 0.0,
+    &quot;state&quot;: 0.0,
+    &quot;country&quot;: 0.0,
+    &quot;discount&quot;: 0.0,
+    &quot;profit&quot;: 0.0,
+    &quot;quantity&quot;: 0.0,
+    &quot;sales&quot;: 0.0,
+    &quot;profit_margin&quot;: 0.0
+  }
+}</pre>
+    </details>
+  </div>
+
+  <div id="tab-raw" class="tab">
+    <h2>Raw JSON (truncated)</h2>
+    <p class="muted">This is the full output envelope, useful for programmatic integration.</p>
+    <pre class="pre">{
+  &quot;version&quot;: &quot;0.2.0&quot;,
+  &quot;dataset&quot;: &quot;timchant/supstore-dataset-2019-2022::superstore_dataset.csv&quot;,
+  &quot;run_ts_utc&quot;: &quot;2026-01-27T02:10:16.408703+00:00&quot;,
+  &quot;row_count&quot;: 9994,
+  &quot;col_count&quot;: 19,
+  &quot;overall_score&quot;: 97.4253123302553,
+  &quot;grade&quot;: &quot;A&quot;,
+  &quot;category_scores&quot;: {
+    &quot;completeness&quot;: 100.0,
+    &quot;validity&quot;: 87.12656165127648,
+    &quot;uniqueness&quot;: 100.0,
+    &quot;consistency&quot;: 100.0,
+    &quot;integrity&quot;: 100.0,
+    &quot;timeliness&quot;: 100.0,
+    &quot;drift&quot;: 100.0
+  },
+  &quot;profile&quot;: {
+    &quot;profile_sampled&quot;: false,
+    &quot;inferred_types&quot;: {
+      &quot;order_id&quot;: &quot;string&quot;,
+      &quot;order_date&quot;: &quot;date&quot;,
+      &quot;ship_date&quot;: &quot;date&quot;,
+      &quot;customer&quot;: &quot;string&quot;,
+      &quot;manufactory&quot;: &quot;category&quot;,
+      &quot;product_name&quot;: &quot;string&quot;,
+      &quot;segment&quot;: &quot;category&quot;,
+      &quot;category&quot;: &quot;category&quot;,
+      &quot;subcategory&quot;: &quot;category&quot;,
+      &quot;region&quot;: &quot;category&quot;,
+      &quot;zip&quot;: &quot;number&quot;,
+      &quot;city&quot;: &quot;string&quot;,
+      &quot;state&quot;: &quot;category&quot;,
+      &quot;country&quot;: &quot;category&quot;,
+      &quot;discount&quot;: &quot;number&quot;,
+      &quot;profit&quot;: &quot;number&quot;,
+      &quot;quantity&quot;: &quot;number&quot;,
+      &quot;sales&quot;: &quot;number&quot;,
+      &quot;profit_margin&quot;: &quot;number&quot;
+    },
+    &quot;null_rate&quot;: {
+      &quot;order_id&quot;: 0.0,
+      &quot;order_date&quot;: 0.0,
+      &quot;ship_date&quot;: 0.0,
+      &quot;customer&quot;: 0.0,
+      &quot;manufactory&quot;: 0.0,
+      &quot;product_name&quot;: 0.0,
+      &quot;segment&quot;: 0.0,
+      &quot;category&quot;: 0.0,
+      &quot;subcategory&quot;: 0.0,
+      &quot;region&quot;: 0.0,
+      &quot;zip&quot;: 0.0,
+      &quot;city&quot;: 0.0,
+      &quot;state&quot;: 0.0,
+      &quot;country&quot;: 0.0,
+      &quot;discount&quot;: 0.0,
+      &quot;profit&quot;: 0.0,
+      &quot;quantity&quot;: 0.0,
+      &quot;sales&quot;: 0.0,
+      &quot;profit_margin&quot;: 0.0
+    },
+    &quot;empty_string_rate&quot;: {
+      &quot;order_id&quot;: 0.0,
+      &quot;order_date&quot;: 0.0,
+      &quot;ship_date&quot;: 0.0,
+      &quot;customer&quot;: 0.0,
+      &quot;manufactory&quot;: 0.0,
+      &quot;product_name&quot;: 0.0,
+      &quot;segment&quot;: 0.0,
+      &quot;category&quot;: 0.0,
+      &quot;subcategory&quot;: 0.0,
+      &quot;region&quot;: 0.0,
+      &quot;zip&quot;: 0.0,
+      &quot;city&quot;: 0.0,
+      &quot;state&quot;: 0.0,
+      &quot;country&quot;: 0.0,
+      &quot;discount&quot;: 0.0,
+      &quot;profit&quot;: 0.0,
+      &quot;quantity&quot;: 0.0,
+      &quot;sales&quot;: 0.0,
+      &quot;profit_margin&quot;: 0.0
+    },
+    &quot;distinct_count&quot;: {
+      &quot;order_id&quot;: 5009,
+      &quot;order_date&quot;: 1236,
+      &quot;ship_date&quot;: 1334,
+      &quot;customer&quot;: 793,
+      &quot;manufactory&quot;: 182,
+      &quot;product_name&quot;: 1849,
+      &quot;segment&quot;: 3,
+      &quot;category&quot;: 3,
+      &quot;subcategory&quot;: 17,
+      &quot;region&quot;: 4,
+      &quot;zip&quot;: 631,
+      &quot;city&quot;: 531,
+      &quot;state&quot;: 49,
+      &quot;country&quot;: 1,
+      &quot;discount&quot;: 12,
+      &quot;profit&quot;: 7287,
+      &quot;quantity&quot;: 14,
+      &quot;sales&quot;: 5825,
+      &quot;profit_margin&quot;: 288
+    },
+    &quot;numeric_stats&quot;: {
+      &quot;order_id&quot;: {},
+      &quot;order_date&quot;: {},
+      &quot;ship_date&quot;: {},
+      &quot;customer&quot;: {},
+      &quot;manufactory&quot;: {},
+      &quot;product_name&quot;: {},
+      &quot;segment&quot;: {},
+      &quot;category&quot;: {},
+      &quot;subcategory&quot;: {},
+      &quot;region&quot;: {},
+      &quot;zip&quot;: {
+        &quot;min&quot;: 1040.0,
+        &quot;max&quot;: 99301.0,
+        &quot;mean&quot;: 55190.37172303382,
+        &quot;std&quot;: 32063.705314666506,
+        &quot;p25&quot;: 23223.0,
+        &quot;p50&quot;: 56430.5,
+        &quot;p75&quot;: 90008.0
+      },
+      &quot;city&quot;: {},
+      &quot;state&quot;: {},
+      &quot;country&quot;: {},
+      &quot;discount&quot;: {
+        &quot;min&quot;: 0.0,
+        &quot;max&quot;: 0.8,
+        &quot;mean&quot;: 0.15620272163297977,
+        &quot;std&quot;: 0.20645196782569636,
+        &quot;p25&quot;: 0.0,
+        &quot;p50&quot;: 0.2,
+        &quot;p75&quot;: 0.2
+      },
+      &quot;profit&quot;: {
+        &quot;min&quot;: -6599.978,
+        &quot;max&quot;: 8399.976,
+        &quot;mean&quot;: 28.656896307784674,
+        &quot;std&quot;: 234.26010769095754,
+        &quot;p25&quot;: 1.72875,
+        &quot;p50&quot;: 8.6665,
+        &quot;p75&quot;: 29.364
+      },
+      &quot;quantity&quot;: {
+        &quot;min&quot;: 1.0,
+        &quot;max&quot;: 14.0,
+        &quot;mean&quot;: 3.789573744246548,
+        &quot;std&quot;: 2.2251096911414243,
+        &quot;p25&quot;: 2.0,
+        &quot;p50&quot;: 3.0,
+        &quot;p75&quot;: 5.0
+      },
+      &quot;sales&quot;: {
+        &quot;min&quot;: 0.444,
+        &quot;max&quot;: 22638.48,
+        &quot;mean&quot;: 229.85800083049827,
+        &quot;std&quot;: 623.245100508682,
+        &quot;p25&quot;: 17.28,
+        &quot;p50&quot;: 54.489999999999995,
+        &quot;p75&quot;: 209.94
+      },
+      &quot;profit_margin&quot;: {
+        &quot;min&quot;: -2.75,
+        &quot;max&quot;: 0.5,
+        &quot;mean&quot;: 0.12031392972173303,
+        &quot;std&quot;: 0.46675434522462733,
+        &quot;p25&quot;: 0.075,
+        &quot;p50&quot;: 0.27,
+        &quot;p75&quot;: 0.3625
+      }
+    },
+    &quot;top_values&quot;: {
+      &quot;order_id&quot;: [],
+      &quot;order_date&quot;: [],
+      &quot;ship_date&quot;: [],
+      &quot;customer&quot;: [
+        [
+          &quot;William Brown&quot;,
+          37
+        ],
+        [
+          &quot;Paul Prost&quot;,
+          34
+        ],
+        [
+          &quot;Matt Abelman&quot;,
+          34
+        ],
+        [
+          &quot;John Lee&quot;,
+          34
+        ],
+        [
+          &quot;Seth Vernon&quot;,
+          32
+        ]
+      ],
+      &quot;manufactory&quot;: [
+        [
+          &quot;Other&quot;,
+          1893
+        ],
+        [
+          &quot;Xerox&quot;,
+          859
+        ],
+        [
+          &quot;Avery&quot;,
+          557
+        ],
+        [
+          &quot;GBC&quot;,
+          332
+        ],
+        [
+          &quot;Global&quot;,
+          291
+        ]
+      ],
+      &quot;product_name&quot;: [
+        [
+          &quot;Staple envelope&quot;,
+          48
+        ],
+        [
+          &quot;Staples&quot;,
+          46
+        ],
+        [
+          &quot;Easy-staple paper&quot;,
+          46
+        ],
+        [
+          &quot;Avery Non-Stick Binders&quot;,
+          20
+        ],
+        [
+          &quot;Staples in misc. colors&quot;,
+          19
+        ]
+      ],
+      &quot;segment&quot;: [
+        [
+          &quot;Consumer&quot;,
+          5191
+        ],
+        [
+          &quot;Corporate&quot;,
+          3020
+        ],
+        [
+          &quot;Home Office&quot;,
+          1783
+        ]
+      ],
+      &quot;category&quot;: [
+        [
+          &quot;Office Supplies&quot;,
+          6026
+        ],
+        [
+          &quot;Furniture&quot;,
+          2121
+        ],
+        [
+          &quot;Technology&quot;,
+          1847
+        ]
+      ],
+      &quot;subcategory&quot;: [
+        [
+          &quot;Binders&quot;,
+          1523
+        ],
+        [
+          &quot;Paper&quot;,
+          1370
+        ],
+        [
+          &quot;Furnishings&quot;,
+          957
+        ],
+        [
+          &quot;Phones&quot;,
+          889
+        ],
+        [
+          &quot;Storage&quot;,
+          846
+        ]
+      ],
+      &quot;region&quot;: [
+        [
+          &quot;West&quot;,
+          3203
+        ],
+        [
+          &quot;East&quot;,
+          2848
+        ],
+        [
+          &quot;Central&quot;,
+          2323
+        ],
+        [
+          &quot;South&quot;,
+          1620
+        ]
+      ],
+      &quot;zip&quot;: [],
+      &quot;city&quot;: [
+        [
+          &quot;New York City&quot;,
+          915
+        ],
+        [
+          &quot;Los Angeles&quot;,
+          747
+        ],
+        [
+          &quot;Philadelphia&quot;,
+          537
+        ],
+        [
+          &quot;San Francisco&quot;,
+          510
+        ],
+        [
+          &quot;Seattle&quot;,
+          428
+        ]
+      ],
+      &quot;state&quot;: [
+        [
+          &quot;California&quot;,
+          2001
+        ],
+        [
+          &quot;New York&quot;,
+          1128
+        ],
+        [
+          &quot;Texas&quot;,
+          985
+        ],
+        [
+          &quot;Pennsylvania&quot;,
+          587
+        ],
+        [
+          &quot;Washington&quot;,
+          506
+        ]
+      ],
+      &quot;country&quot;: [
+        [
+          &quot;United States&quot;,
+          9994
+        ]
+      ],
+      &quot;discount&quot;: [],
+      &quot;profit&quot;: [],
+      &quot;quantity&quot;: [],
+      &quot;sales&quot;: [],
+      &quot;profit_margin&quot;: []
+    },
+    &quot;parse_failure_rate&quot;: {
+      &quot;order_id&quot;: 0.0,
+      &quot;order_date&quot;: 0.0,
+      &quot;ship_date&quot;: 0.0,
+      &quot;customer&quot;: 0.0,
+      &quot;manufactory&quot;: 0.0,
+      &quot;product_name&quot;: 0.0,
+      &quot;segment&quot;: 0.0,
+      &quot;category&quot;: 0.0,
+      &quot;subcategory&quot;: 0.0,
+      &quot;region&quot;: 0.0,
+      &quot;zip&quot;: 0.0,
+      &quot;city&quot;: 0.0,
+      &quot;state&quot;: 0.0,
+      &quot;country&quot;: 0.0,
+      &quot;discount&quot;: 0.0,
+      &quot;profit&quot;: 0.0,
+      &quot;quantity&quot;: 0.0,
+      &quot;sales&quot;: 0.0,
+      &quot;profit_margin&quot;: 0.0
+    }
+  },
+  &quot;checks&quot;: [
+    {
+      &quot;id&quot;: &quot;null_rates&quot;,
+      &quot;display_name&quot;: &quot;Missing values&quot;,
+      &quot;category&quot;: &quot;completeness&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;estimated&quot;: false,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.05,
+        &quot;threshold_fail&quot;: 0.1,
+        &quot;worst_null_rate&quot;: 0.0,
+        &quot;warn_columns&quot;: [],
+        &quot;fail_columns&quot;: []
+      },
+      &quot;recommendation&quot;: &quot;Investigate source/system gaps; consider imputation only after root-cause review.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;empty_strings&quot;,
+      &quot;display_name&quot;: &quot;Blank text values&quot;,
+      &quot;category&quot;: &quot;completeness&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;estimated&quot;: false,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.02,
+        &quot;threshold_fail&quot;: 0.05,
+        &quot;worst_empty_string_rate&quot;: 0.0,
+        &quot;warn_columns&quot;: [],
+        &quot;fail_columns&quot;: []
+      },
+      &quot;recommendation&quot;: &quot;Trim strings and normalize blanks to NULL; fix upstream exporters where possible.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;parse_failures&quot;,
+      &quot;display_name&quot;: &quot;Numbers/dates that don&#x27;t parse cleanly&quot;,
+      &quot;category&quot;: &quot;validity&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;estimated&quot;: false,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.01,
+        &quot;threshold_fail&quot;: 0.03,
+        &quot;worst_parse_failure_rate&quot;: 0.0,
+        &quot;warn_columns&quot;: [],
+        &quot;fail_columns&quot;: []
+      },
+      &quot;recommendation&quot;: &quot;Normalize formats upstream; enforce schema contracts or robust parsing before analytics.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;numeric_outliers_iqr&quot;,
+      &quot;display_name&quot;: &quot;Unusual numeric values (possible outliers)&quot;,
+      &quot;category&quot;: &quot;validity&quot;,
+      &quot;score_0_1&quot;: 0.7425312330255296,
+      &quot;score_0_100&quot;: 74.25312330255296,
+      &quot;status&quot;: &quot;warn&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;estimated&quot;: false,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.02,
+        &quot;threshold_fail&quot;: 0.05,
+        &quot;worst_outlier_rate&quot;: 0.188212927756654,
+        &quot;top_outlier_columns&quot;: [
+          [
+            &quot;profit&quot;,
+            0.188212927756654
+          ],
+          [
+            &quot;sales&quot;,
+            0.11677006203722233
+          ],
+          [
+            &quot;profit_margin&quot;,
+            0.09525715429257554
+          ],
+          [
+            &quot;discount&quot;,
+            0.0856513908345007
+          ],
+          [
+            &quot;quantity&quot;,
+            0.017010206123674206
+          ],
+          [
+            &quot;zip&quot;,
+            0.0
+          ]
+        ],
+        &quot;heavy_tail_flags&quot;: {
+          &quot;discount&quot;: [
+            &quot;tail_spread_ratio=inf&gt;10&quot;
+          ],
+          &quot;profit&quot;: [
+            &quot;skew=7.56&gt;2&quot;,
+            &quot;p99/p50=67.0&gt;10&quot;,
+            &quot;tail_spread_ratio=27.6&gt;10&quot;
+          ],
+          &quot;sales&quot;: [
+            &quot;skew=12.97&gt;2&quot;,
+            &quot;p99/p50=45.5&gt;10&quot;,
+            &quot;tail_spread_ratio=15.6&gt;10&quot;
+          ]
+        },
+        &quot;strict_fail&quot;: false
+      },
+      &quot;recommendation&quot;: &quot;High outlier rates are common in money/count data. Spot-check units (cents vs dollars), then decide whether to use robust stats (medians), winsorization, or config exclusions.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;duplicate_rows&quot;,
+      &quot;display_name&quot;: &quot;Duplicate rows&quot;,
+      &quot;category&quot;: &quot;uniqueness&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;estimated&quot;: false,
+      &quot;details&quot;: {
+        &quot;duplicate_row_rate&quot;: 0.00020012007204322593,
+        &quot;threshold_warn&quot;: 0.01,
+        &quot;threshold_fail&quot;: 0.03,
+        &quot;sampled&quot;: false,
+        &quot;sample_size&quot;: null
+      },
+      &quot;recommendation&quot;: &quot;Identify duplicate-producing joins or reprocessing; dedupe using stable keys where appropriate.&quot;
+    }
+  ],
+  &quot;config_applied&quot;: {
+    &quot;weights&quot;: {
+      &quot;categories&quot;: {
+        &quot;completeness&quot;: 0.2,
+        &quot;validity&quot;: 0.2,
+        &quot;consistency&quot;: 0.15,
+        &quot;uniqueness&quot;: 0.1,
+        &quot;integrity&quot;: 0.15,
+        &quot;timeliness&quot;: 0.1,
+        &quot;drift&quot;: 0.1
+      }
+    },
+    &quot;thresholds&quot;: {
+      &quot;null_rate_warn&quot;: 0.05,
+      &quot;null_rate_fail&quot;: 0.1,
+      &quot;empty_string_warn&quot;: 0.02,
+      &quot;empty_string_fail&quot;: 0.05,
+      &quot;duplicate_row_warn&quot;: 0.01,
+      &quot;duplicate_row_fail&quot;: 0.03,
+      &quot;outlier_rate_warn&quot;: 0.02,
+      &quot;outlier_rate_fail&quot;: 0.05,
+      &quot;parse_failure_warn&quot;: 0.01,
+      &quot;parse_failure_fail&quot;: 0.03
+    },
+    &quot;runtime&quot;: {
+      &quot;max_rows_profile&quot;: 200000,
+      &quot;type_infer_sample&quot;: 10000,
+      &quot;duplicate_sample&quot;: 200000,
+      &quot;outlier_sample&quot;: 200000,
+      &quot;sample_top_values&quot;: 5,
+      &quot;max_top_value_uniques&quot;: 5000,
+      &quot;random_state&quot;: 42
+    }
+  },
+  &quot;friendly_summary&quot;: {
+    &quot;readiness&quot;: &quot;Ready for analytics&quot;,
+    &quot;top_issues&quot;: [
+      {
+        &quot;title&quot;: &quot;Unusual numeric values (possible outliers)&quot;,
+        &quot;id&quot;: &quot;numeric_outliers_iqr&quot;,
+        &quot;status&quot;: &quot;Needs attention&quot;,
+        &quot;severity&quot;: &quot;Medium&quot;,
+        &quot;score&quot;: 74.25312330255296,
+        &quot;estimated&quot;: false
+      }
+    ],
+    &quot;insights&quot;: [
+      {
+        &quot;title&quot;: &quot;Missing values&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some fields are missing values. The highest missing rate is 0.0%.&quot;,
+        &quot;why_it_matters&quot;: &quot;Missing values can break metrics, reduce trust, and bias analytics.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Confirm whether missing fields are expected (optional) or should be required.&quot;,
+          &quot;Trace missingness back to the source system or ingestion step.&quot;,
+          &quot;Choose a repair approach: backfill, mapping fixes, or controlled imputation.&quot;
+        ],
+        &quot;where_to_look&quot;: [],
+        &quot;estimated&quot;: false
+      },
+      {
+        &quot;title&quot;: &quot;Blank text values&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some text fields are blank (empty strings). Worst blank rate is 0.0%.&quot;,
+        &quot;why_it_matters&quot;: &quot;Blank text can look like real data but behaves like missingness in analysis.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Normalize blanks to NULL during ingestion/cleaning.&quot;,
+          &quot;Trim whitespace and standardize placeholders like &#x27;N/A&#x27;, &#x27;-&#x27;, &#x27;unknown&#x27;.&quot;
+        ],
+        &quot;where_to_look&quot;: [],
+        &quot;estimated&quot;: false
+      },
+      {
+        &quot;title&quot;: &quot;Numbers/dates that don&#x27;t parse cleanly&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some fields look like dates or numbers but don\u2019t parse reliably. Worst rate is 0.0%.&quot;,
+        &quot;why_it_matters&quot;: &quot;Parsing issues cause incorrect sorting, filtering, and aggregations.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Standardize formats at the source (dates, currency symbols, decimals).&quot;,
+          &quot;Apply consistent casting rules during ingestion.&quot;,
+          &quot;Use config to enforce schema for critical fields.&quot;
+        ],
+        &quot;where_to_look&quot;: [],
+        &quot;estimated&quot;: false
+      },
+      {
+        &quot;title&quot;: &quot;Unusual numeric values (possible outliers)&quot;,
+        &quot;status&quot;: &quot;Needs attention&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some numeric fields have many unusual values. Highest rate is 18.8%.&quot;,
+        &quot;why_it_matters&quot;: &quot;This can indicate unit issues or valid skew (prices/amounts). Either way it affects averages and models.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Spot-check top fields for unit/format problems (cents vs dollars).&quot;,
+          &quot;If valid but skewed, consider medians/robust stats in dashboards.&quot;,
+          &quot;Use config to tighten/loosen thresholds or exclude columns.&quot;
+        ],
+        &quot;where_to_look&quot;: [
+          &quot;profit (18.8%)&quot;,
+          &quot;sales (11.7%)&quot;,
+          &quot;profit_margin (9.5%)&quot;
+        ],
+        &quot;estimated&quot;: false
+      },
+      {
+        &quot;title&quot;: &quot;Duplicate rows&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;About 0.02% of rows appear duplicated.&quot;,
+        &quot;why_it_matters&quot;: &quot;Duplicates can inflate counts, sums, and conversion rates.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Confirm expected grain (one row per order/event/entity).&quot;,
+          &quot;Look for reprocessing or join explosions.&quot;,
+          &quot;Dedupe using a stable key if appropriate.&quot;
+        ],
+        &quot;where_to_look&quot;: [],
+        &quot;estimated&quot;: false
+      }
+    ],
+    &quot;plain_language_notes&quot;: [
+      &quot;\u2018Needs attention\u2019 means it may impact analytics, but could be expected depending on your data.&quot;,
+      &quot;Checks marked \u2018estimated\u2019 were computed on a sample for speed (good for triage).&quot;,
+      &quot;Use config to enforce strict rules (required fields, keys, timeliness, and safe cross-field rules).&quot;
+    ]
+  }
+}</pre>
+  </div>
+
+  <script>
+    const tabButtons = document.querySelectorAll('.tabbtn');
+    const tabs = {
+      summary: document.getElementById('tab-summary'),
+      checks: document.getElementById('tab-checks'),
+      profile: document.getElementById('tab-profile'),
+      raw: document.getElementById('tab-raw'),
+    };
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        Object.values(tabs).forEach(t => t.classList.remove('active'));
+        const key = btn.getAttribute('data-tab');
+        tabs[key].classList.add('active');
+      });
+    });
+
+    const statusFilter = document.getElementById('statusFilter');
+    const searchBox = document.getElementById('searchBox');
+    const table = document.getElementById('checksTable');
+
+    function applyFilters() {
+      const statusVal = statusFilter.value;
+      const q = (searchBox.value || '').toLowerCase();
+      const rows = table.querySelectorAll('tr[data-status]');
+      rows.forEach(r => {
+        const st = r.getAttribute('data-status');
+        const text = r.innerText.toLowerCase();
+        const statusOk = (statusVal === 'all') || (st === statusVal);
+        const searchOk = (!q) || text.includes(q);
+        r.style.display = (statusOk && searchOk) ? '' : 'none';
+      });
+    }
+    statusFilter.addEventListener('change', applyFilters);
+    searchBox.addEventListener('input', applyFilters);
+  </script>
+</body>
+</html>

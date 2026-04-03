@@ -1,0 +1,1286 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Data Health Report - heptapod/titanic::train_and_test2.csv</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    .kpi { display: flex; gap: 18px; margin-bottom: 18px; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px 14px; }
+    .row { display:flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+    .title { font-size: 16px; }
+    .meta { color: #333; font-size: 13px; }
+    .dot { padding: 0 6px; }
+    .block { margin-top: 8px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #fafafa; }
+    .pass { color: #0a7; font-weight: bold; }
+    .warn { color: #c80; font-weight: bold; }
+    .fail { color: #c00; font-weight: bold; }
+    code { background: #f6f6f6; padding: 1px 4px; border-radius: 4px; }
+    .pre { white-space: pre-wrap; margin: 8px 0 0 0; }
+    .tabs { display:flex; gap: 10px; margin: 18px 0; flex-wrap: wrap; }
+    .tabbtn { border: 1px solid #ddd; background: #fff; border-radius: 999px; padding: 8px 12px; cursor: pointer; }
+    .tabbtn.active { background: #f1f5ff; border-color: #cfd8ff; }
+    .tab { display:none; }
+    .tab.active { display:block; }
+    .filters { display:flex; gap:10px; align-items:center; margin: 10px 0 14px 0; flex-wrap: wrap; }
+    select { padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; }
+    input[type="text"] { padding: 6px 8px; border-radius: 8px; border: 1px solid #ddd; min-width: 240px; }
+    .muted { color:#666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>Data Health Report</h1>
+  <p>
+    <b>Dataset:</b> heptapod/titanic::train_and_test2.csv<br>
+    <b>Run (UTC):</b> 2026-01-13T02:40:41.318915+00:00<br>
+    <b>Rows:</b> 1309 &nbsp;&nbsp; <b>Columns:</b> 28
+  </p>
+
+  <div class="kpi">
+    <div class="card"><div><b>Overall Score</b></div><div style="font-size:28px">98.3</div></div>
+    <div class="card"><div><b>Grade</b></div><div style="font-size:28px">A</div></div>
+    <div class='card'><div><b>Readiness</b></div><div style='font-size:18px'>Ready for analytics</div><div class='muted'>Plain-English assessment</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tabbtn active" data-tab="summary">Summary</button>
+    <button class="tabbtn" data-tab="checks">Checks</button>
+    <button class="tabbtn" data-tab="profile">Profile</button>
+    <button class="tabbtn" data-tab="raw">Raw JSON</button>
+  </div>
+
+  <div id="tab-summary" class="tab active">
+    <h2>Category Scores</h2>
+    <table>
+      <tr><th>Category</th><th>Score</th></tr>
+      <tr><td>completeness</td><td>100.0</td></tr><tr><td>validity</td><td>91.5</td></tr><tr><td>uniqueness</td><td>100.0</td></tr><tr><td>consistency</td><td>100.0</td></tr><tr><td>integrity</td><td>100.0</td></tr><tr><td>timeliness</td><td>100.0</td></tr><tr><td>drift</td><td>100.0</td></tr>
+    </table>
+
+    <h2 style="margin-top:18px;">Top issues</h2>
+    <ul><li><b>Needs attention:</b> numeric_outliers_iqr (score 83.1)</li></ul>
+
+    <h2 style="margin-top:18px;">What to look at next</h2>
+    
+            <div class="card" style="margin-bottom:12px;">
+              <div class="row">
+                <div class="title"><b>Unusual numeric values (possible outliers)</b></div>
+                <div class="meta">
+                  <span class="warn">
+                    Needs attention
+                  </span>
+                  <span class="dot">·</span>
+                  Impact: Medium
+                </div>
+              </div>
+              <div class="block"><b>What we found:</b> Some numeric fields have many unusual values. Highest rate is 13.1%.</div>
+              <div class="block"><b>Why it matters:</b> This often happens with naturally skewed data (like prices/amounts). It can still be valid, but it may affect averages and models.</div>
+              <div class='block'><b>Where to look:</b> Fare (13.1%), Age (7.7%), sibsp (4.4%)</div>
+              <div class='block'><b>What to do next:</b><ul><li>Spot-check the top fields for unit/format problems (e.g., cents vs dollars).</li><li>If values are valid but skewed, consider using medians, robust stats, or winsorization for analytics.</li><li>Use the optional config to tighten/loosen thresholds or exclude columns.</li></ul></div>
+            </div>
+            
+  </div>
+
+  <div id="tab-checks" class="tab">
+    <h2>All checks</h2>
+    <div class="filters">
+      <label class="muted">Filter:</label>
+      <select id="statusFilter">
+        <option value="all">All</option>
+        <option value="fail">Action needed</option>
+        <option value="warn">Needs attention</option>
+        <option value="pass">Pass</option>
+      </select>
+      <label class="muted">Search:</label>
+      <input id="searchBox" type="text" placeholder="e.g., null, outlier, key, parse..." />
+      <span class="muted">Tip: click “View” to expand details</span>
+    </div>
+
+    <table id="checksTable">
+      <tr>
+        <th>Status</th><th>Category</th><th>Check</th><th>Score</th><th>Recommendation</th><th>Details</th>
+      </tr>
+      
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>completeness</td>
+          <td><code>null_rates</code></td>
+          <td>100.0</td>
+          <td>Investigate source/system gaps; consider imputation only after root-cause review.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.05,
+  &quot;threshold_fail&quot;: 0.1,
+  &quot;worst_null_rate&quot;: 0.0015278838808250573,
+  &quot;warn_columns&quot;: [],
+  &quot;fail_columns&quot;: []
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>completeness</td>
+          <td><code>empty_strings</code></td>
+          <td>100.0</td>
+          <td>Trim strings and normalize blanks to NULL; fix upstream exporters where possible.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.02,
+  &quot;threshold_fail&quot;: 0.05,
+  &quot;worst_empty_string_rate&quot;: 0.0,
+  &quot;warn_columns&quot;: [],
+  &quot;fail_columns&quot;: []
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>validity</td>
+          <td><code>parse_failures</code></td>
+          <td>100.0</td>
+          <td>Normalize formats upstream; enforce contracts or robust parsing before analytics.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.01,
+  &quot;threshold_fail&quot;: 0.03,
+  &quot;worst_parse_failure_rate&quot;: 0.0,
+  &quot;warn_columns&quot;: [],
+  &quot;fail_columns&quot;: []
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="warn">
+          <td class="warn">warn</td>
+          <td>validity</td>
+          <td><code>numeric_outliers_iqr</code></td>
+          <td>83.1</td>
+          <td>High IQR outlier rates often indicate skew/heavy tails (common in money/count data). Use the optional config to enforce strict failing, set per-column rules, or exclude columns from outlier scoring.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;threshold_warn&quot;: 0.02,
+  &quot;threshold_fail&quot;: 0.05,
+  &quot;worst_outlier_rate&quot;: 0.1306340718105424,
+  &quot;top_outlier_columns&quot;: [
+    [
+      &quot;Fare&quot;,
+      0.1306340718105424
+    ],
+    [
+      &quot;Age&quot;,
+      0.07715813598166539
+    ],
+    [
+      &quot;sibsp&quot;,
+      0.04354469060351413
+    ],
+    [
+      &quot;Passengerid&quot;,
+      0.0
+    ],
+    [
+      &quot;Pclass&quot;,
+      0.0
+    ],
+    [
+      &quot;Embarked&quot;,
+      0.0
+    ]
+  ],
+  &quot;heavy_tail_flags&quot;: {
+    &quot;Fare&quot;: [
+      &quot;skew=4.36&gt;2&quot;,
+      &quot;p99/p50=18.2&gt;10&quot;,
+      &quot;tail_spread_ratio=14.7&gt;10&quot;
+    ],
+    &quot;sibsp&quot;: [
+      &quot;skew=3.84&gt;2&quot;,
+      &quot;p99/p50=inf&gt;10&quot;
+    ],
+    &quot;Pclass&quot;: [
+      &quot;tail_spread_ratio=inf&gt;10&quot;
+    ],
+    &quot;Embarked&quot;: [
+      &quot;tail_spread_ratio=inf&gt;10&quot;
+    ]
+  },
+  &quot;strict_fail&quot;: false
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+        <tr data-status="pass">
+          <td class="pass">pass</td>
+          <td>uniqueness</td>
+          <td><code>duplicate_rows</code></td>
+          <td>100.0</td>
+          <td>Identify duplicate-producing joins or reprocessing; dedupe using stable keys where appropriate.</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <pre class="pre">{
+  &quot;duplicate_row_rate&quot;: 0.0,
+  &quot;threshold_warn&quot;: 0.01,
+  &quot;threshold_fail&quot;: 0.03
+}</pre>
+            </details>
+          </td>
+        </tr>
+        
+    </table>
+  </div>
+
+  <div id="tab-profile" class="tab">
+    <h2>Quick profile</h2>
+
+    <h3>Most missing fields (top 15)</h3>
+    <table>
+      <tr><th>Column</th><th>Missing</th></tr>
+      <tr><td>Embarked</td><td>0.2%</td></tr><tr><td>Passengerid</td><td>0.0%</td></tr><tr><td>Age</td><td>0.0%</td></tr><tr><td>Fare</td><td>0.0%</td></tr><tr><td>Sex</td><td>0.0%</td></tr><tr><td>sibsp</td><td>0.0%</td></tr><tr><td>zero</td><td>0.0%</td></tr><tr><td>zero.1</td><td>0.0%</td></tr><tr><td>zero.2</td><td>0.0%</td></tr><tr><td>zero.3</td><td>0.0%</td></tr><tr><td>zero.4</td><td>0.0%</td></tr><tr><td>zero.5</td><td>0.0%</td></tr><tr><td>zero.6</td><td>0.0%</td></tr><tr><td>Parch</td><td>0.0%</td></tr><tr><td>zero.7</td><td>0.0%</td></tr>
+    </table>
+
+    <h3 style="margin-top:16px;">Columns overview (first 25)</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Distinct</th><th>Missing</th></tr>
+      <tr><td>Passengerid</td><td>number</td><td>1309</td><td>0.0%</td></tr><tr><td>Age</td><td>number</td><td>98</td><td>0.0%</td></tr><tr><td>Fare</td><td>number</td><td>281</td><td>0.0%</td></tr><tr><td>Sex</td><td>bool</td><td>2</td><td>0.0%</td></tr><tr><td>sibsp</td><td>number</td><td>7</td><td>0.0%</td></tr><tr><td>zero</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.1</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.2</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.3</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.4</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.5</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.6</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>Parch</td><td>number</td><td>8</td><td>0.0%</td></tr><tr><td>zero.7</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.8</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.9</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.10</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.11</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.12</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.13</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.14</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>Pclass</td><td>number</td><td>3</td><td>0.0%</td></tr><tr><td>zero.15</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>zero.16</td><td>bool</td><td>1</td><td>0.0%</td></tr><tr><td>Embarked</td><td>number</td><td>3</td><td>0.2%</td></tr>
+    </table>
+
+    <details style="margin-top:14px;">
+      <summary>Show full profile JSON</summary>
+      <pre class="pre">{
+  &quot;inferred_types&quot;: {
+    &quot;Passengerid&quot;: &quot;number&quot;,
+    &quot;Age&quot;: &quot;number&quot;,
+    &quot;Fare&quot;: &quot;number&quot;,
+    &quot;Sex&quot;: &quot;bool&quot;,
+    &quot;sibsp&quot;: &quot;number&quot;,
+    &quot;zero&quot;: &quot;bool&quot;,
+    &quot;zero.1&quot;: &quot;bool&quot;,
+    &quot;zero.2&quot;: &quot;bool&quot;,
+    &quot;zero.3&quot;: &quot;bool&quot;,
+    &quot;zero.4&quot;: &quot;bool&quot;,
+    &quot;zero.5&quot;: &quot;bool&quot;,
+    &quot;zero.6&quot;: &quot;bool&quot;,
+    &quot;Parch&quot;: &quot;number&quot;,
+    &quot;zero.7&quot;: &quot;bool&quot;,
+    &quot;zero.8&quot;: &quot;bool&quot;,
+    &quot;zero.9&quot;: &quot;bool&quot;,
+    &quot;zero.10&quot;: &quot;bool&quot;,
+    &quot;zero.11&quot;: &quot;bool&quot;,
+    &quot;zero.12&quot;: &quot;bool&quot;,
+    &quot;zero.13&quot;: &quot;bool&quot;,
+    &quot;zero.14&quot;: &quot;bool&quot;,
+    &quot;Pclass&quot;: &quot;number&quot;,
+    &quot;zero.15&quot;: &quot;bool&quot;,
+    &quot;zero.16&quot;: &quot;bool&quot;,
+    &quot;Embarked&quot;: &quot;number&quot;,
+    &quot;zero.17&quot;: &quot;bool&quot;,
+    &quot;zero.18&quot;: &quot;bool&quot;,
+    &quot;2urvived&quot;: &quot;bool&quot;
+  },
+  &quot;null_rate&quot;: {
+    &quot;Passengerid&quot;: 0.0,
+    &quot;Age&quot;: 0.0,
+    &quot;Fare&quot;: 0.0,
+    &quot;Sex&quot;: 0.0,
+    &quot;sibsp&quot;: 0.0,
+    &quot;zero&quot;: 0.0,
+    &quot;zero.1&quot;: 0.0,
+    &quot;zero.2&quot;: 0.0,
+    &quot;zero.3&quot;: 0.0,
+    &quot;zero.4&quot;: 0.0,
+    &quot;zero.5&quot;: 0.0,
+    &quot;zero.6&quot;: 0.0,
+    &quot;Parch&quot;: 0.0,
+    &quot;zero.7&quot;: 0.0,
+    &quot;zero.8&quot;: 0.0,
+    &quot;zero.9&quot;: 0.0,
+    &quot;zero.10&quot;: 0.0,
+    &quot;zero.11&quot;: 0.0,
+    &quot;zero.12&quot;: 0.0,
+    &quot;zero.13&quot;: 0.0,
+    &quot;zero.14&quot;: 0.0,
+    &quot;Pclass&quot;: 0.0,
+    &quot;zero.15&quot;: 0.0,
+    &quot;zero.16&quot;: 0.0,
+    &quot;Embarked&quot;: 0.0015278838808250573,
+    &quot;zero.17&quot;: 0.0,
+    &quot;zero.18&quot;: 0.0,
+    &quot;2urvived&quot;: 0.0
+  },
+  &quot;empty_string_rate&quot;: {
+    &quot;Passengerid&quot;: 0.0,
+    &quot;Age&quot;: 0.0,
+    &quot;Fare&quot;: 0.0,
+    &quot;Sex&quot;: 0.0,
+    &quot;sibsp&quot;: 0.0,
+    &quot;zero&quot;: 0.0,
+    &quot;zero.1&quot;: 0.0,
+    &quot;zero.2&quot;: 0.0,
+    &quot;zero.3&quot;: 0.0,
+    &quot;zero.4&quot;: 0.0,
+    &quot;zero.5&quot;: 0.0,
+    &quot;zero.6&quot;: 0.0,
+    &quot;Parch&quot;: 0.0,
+    &quot;zero.7&quot;: 0.0,
+    &quot;zero.8&quot;: 0.0,
+    &quot;zero.9&quot;: 0.0,
+    &quot;zero.10&quot;: 0.0,
+    &quot;zero.11&quot;: 0.0,
+    &quot;zero.12&quot;: 0.0,
+    &quot;zero.13&quot;: 0.0,
+    &quot;zero.14&quot;: 0.0,
+    &quot;Pclass&quot;: 0.0,
+    &quot;zero.15&quot;: 0.0,
+    &quot;zero.16&quot;: 0.0,
+    &quot;Embarked&quot;: 0.0,
+    &quot;zero.17&quot;: 0.0,
+    &quot;zero.18&quot;: 0.0,
+    &quot;2urvived&quot;: 0.0
+  },
+  &quot;distinct_count&quot;: {
+    &quot;Passengerid&quot;: 1309,
+    &quot;Age&quot;: 98,
+    &quot;Fare&quot;: 281,
+    &quot;Sex&quot;: 2,
+    &quot;sibsp&quot;: 7,
+    &quot;zero&quot;: 1,
+    &quot;zero.1&quot;: 1,
+    &quot;zero.2&quot;: 1,
+    &quot;zero.3&quot;: 1,
+    &quot;zero.4&quot;: 1,
+    &quot;zero.5&quot;: 1,
+    &quot;zero.6&quot;: 1,
+    &quot;Parch&quot;: 8,
+    &quot;zero.7&quot;: 1,
+    &quot;zero.8&quot;: 1,
+    &quot;zero.9&quot;: 1,
+    &quot;zero.10&quot;: 1,
+    &quot;zero.11&quot;: 1,
+    &quot;zero.12&quot;: 1,
+    &quot;zero.13&quot;: 1,
+    &quot;zero.14&quot;: 1,
+    &quot;Pclass&quot;: 3,
+    &quot;zero.15&quot;: 1,
+    &quot;zero.16&quot;: 1,
+    &quot;Embarked&quot;: 3,
+    &quot;zero.17&quot;: 1,
+    &quot;zero.18&quot;: 1,
+    &quot;2urvived&quot;: 2
+  },
+  &quot;numeric_stats&quot;: {
+    &quot;Passengerid&quot;: {
+      &quot;min&quot;: 1.0,
+      &quot;max&quot;: 1309.0,
+      &quot;mean&quot;: 655.0,
+      &quot;std&quot;: 378.0200611960517,
+      &quot;p25&quot;: 328.0,
+      &quot;p50&quot;: 655.0,
+      &quot;p75&quot;: 982.0
+    },
+    &quot;Age&quot;: {
+      &quot;min&quot;: 0.17,
+      &quot;max&quot;: 80.0,
+      &quot;mean&quot;: 29.50318563789152,
+      &quot;std&quot;: 12.905240585464622,
+      &quot;p25&quot;: 22.0,
+      &quot;p50&quot;: 28.0,
+      &quot;p75&quot;: 35.0
+    },
+    &quot;Fare&quot;: {
+      &quot;min&quot;: 0.0,
+      &quot;max&quot;: 512.3292,
+      &quot;mean&quot;: 33.28108563789152,
+      &quot;std&quot;: 51.74149976752607,
+      &quot;p25&quot;: 7.8958,
+      &quot;p50&quot;: 14.4542,
+      &quot;p75&quot;: 31.275
+    },
+    &quot;sibsp&quot;: {
+      &quot;min&quot;: 0.0,
+      &quot;max&quot;: 8.0,
+      &quot;mean&quot;: 0.4988540870893812,
+      &quot;std&quot;: 1.0416583905960977,
+      &quot;p25&quot;: 0.0,
+      &quot;p50&quot;: 0.0,
+      &quot;p75&quot;: 1.0
+    },
+    &quot;Parch&quot;: {
+      &quot;min&quot;: 0.0,
+      &quot;max&quot;: 9.0,
+      &quot;mean&quot;: 0.3850267379679144,
+      &quot;std&quot;: 0.8655602753495125,
+      &quot;p25&quot;: 0.0,
+      &quot;p50&quot;: 0.0,
+      &quot;p75&quot;: 0.0
+    },
+    &quot;Pclass&quot;: {
+      &quot;min&quot;: 1.0,
+      &quot;max&quot;: 3.0,
+      &quot;mean&quot;: 2.294881588999236,
+      &quot;std&quot;: 0.8378360189701319,
+      &quot;p25&quot;: 2.0,
+      &quot;p50&quot;: 3.0,
+      &quot;p75&quot;: 3.0
+    },
+    &quot;Embarked&quot;: {
+      &quot;min&quot;: 0.0,
+      &quot;max&quot;: 2.0,
+      &quot;mean&quot;: 1.4927314460596786,
+      &quot;std&quot;: 0.8146255675254218,
+      &quot;p25&quot;: 1.0,
+      &quot;p50&quot;: 2.0,
+      &quot;p75&quot;: 2.0
+    }
+  },
+  &quot;top_values&quot;: {
+    &quot;Passengerid&quot;: [],
+    &quot;Age&quot;: [],
+    &quot;Fare&quot;: [],
+    &quot;Sex&quot;: [
+      [
+        &quot;0&quot;,
+        843
+      ],
+      [
+        &quot;1&quot;,
+        466
+      ]
+    ],
+    &quot;sibsp&quot;: [],
+    &quot;zero&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.1&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.2&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.3&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.4&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.5&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.6&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;Parch&quot;: [],
+    &quot;zero.7&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.8&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.9&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.10&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.11&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.12&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.13&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.14&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;Pclass&quot;: [],
+    &quot;zero.15&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.16&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;Embarked&quot;: [],
+    &quot;zero.17&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;zero.18&quot;: [
+      [
+        &quot;0&quot;,
+        1309
+      ]
+    ],
+    &quot;2urvived&quot;: [
+      [
+        &quot;0&quot;,
+        967
+      ],
+      [
+        &quot;1&quot;,
+        342
+      ]
+    ]
+  },
+  &quot;parse_failure_rate&quot;: {
+    &quot;Passengerid&quot;: 0.0,
+    &quot;Age&quot;: 0.0,
+    &quot;Fare&quot;: 0.0,
+    &quot;Sex&quot;: 0.0,
+    &quot;sibsp&quot;: 0.0,
+    &quot;zero&quot;: 0.0,
+    &quot;zero.1&quot;: 0.0,
+    &quot;zero.2&quot;: 0.0,
+    &quot;zero.3&quot;: 0.0,
+    &quot;zero.4&quot;: 0.0,
+    &quot;zero.5&quot;: 0.0,
+    &quot;zero.6&quot;: 0.0,
+    &quot;Parch&quot;: 0.0,
+    &quot;zero.7&quot;: 0.0,
+    &quot;zero.8&quot;: 0.0,
+    &quot;zero.9&quot;: 0.0,
+    &quot;zero.10&quot;: 0.0,
+    &quot;zero.11&quot;: 0.0,
+    &quot;zero.12&quot;: 0.0,
+    &quot;zero.13&quot;: 0.0,
+    &quot;zero.14&quot;: 0.0,
+    &quot;Pclass&quot;: 0.0,
+    &quot;zero.15&quot;: 0.0,
+    &quot;zero.16&quot;: 0.0,
+    &quot;Embarked&quot;: 0.0,
+    &quot;zero.17&quot;: 0.0,
+    &quot;zero.18&quot;: 0.0,
+    &quot;2urvived&quot;: 0.0
+  }
+}</pre>
+    </details>
+  </div>
+
+  <div id="tab-raw" class="tab">
+    <h2>Raw JSON (truncated)</h2>
+    <p class="muted">This is the full output envelope, useful for programmatic integration.</p>
+    <pre class="pre">{
+  &quot;dataset&quot;: &quot;heptapod/titanic::train_and_test2.csv&quot;,
+  &quot;run_ts_utc&quot;: &quot;2026-01-13T02:40:41.318915+00:00&quot;,
+  &quot;row_count&quot;: 1309,
+  &quot;col_count&quot;: 28,
+  &quot;overall_score&quot;: 98.30662134983864,
+  &quot;grade&quot;: &quot;A&quot;,
+  &quot;category_scores&quot;: {
+    &quot;completeness&quot;: 100.0,
+    &quot;validity&quot;: 91.53310674919318,
+    &quot;uniqueness&quot;: 100.0,
+    &quot;consistency&quot;: 100.0,
+    &quot;integrity&quot;: 100.0,
+    &quot;timeliness&quot;: 100.0,
+    &quot;drift&quot;: 100.0
+  },
+  &quot;profile&quot;: {
+    &quot;inferred_types&quot;: {
+      &quot;Passengerid&quot;: &quot;number&quot;,
+      &quot;Age&quot;: &quot;number&quot;,
+      &quot;Fare&quot;: &quot;number&quot;,
+      &quot;Sex&quot;: &quot;bool&quot;,
+      &quot;sibsp&quot;: &quot;number&quot;,
+      &quot;zero&quot;: &quot;bool&quot;,
+      &quot;zero.1&quot;: &quot;bool&quot;,
+      &quot;zero.2&quot;: &quot;bool&quot;,
+      &quot;zero.3&quot;: &quot;bool&quot;,
+      &quot;zero.4&quot;: &quot;bool&quot;,
+      &quot;zero.5&quot;: &quot;bool&quot;,
+      &quot;zero.6&quot;: &quot;bool&quot;,
+      &quot;Parch&quot;: &quot;number&quot;,
+      &quot;zero.7&quot;: &quot;bool&quot;,
+      &quot;zero.8&quot;: &quot;bool&quot;,
+      &quot;zero.9&quot;: &quot;bool&quot;,
+      &quot;zero.10&quot;: &quot;bool&quot;,
+      &quot;zero.11&quot;: &quot;bool&quot;,
+      &quot;zero.12&quot;: &quot;bool&quot;,
+      &quot;zero.13&quot;: &quot;bool&quot;,
+      &quot;zero.14&quot;: &quot;bool&quot;,
+      &quot;Pclass&quot;: &quot;number&quot;,
+      &quot;zero.15&quot;: &quot;bool&quot;,
+      &quot;zero.16&quot;: &quot;bool&quot;,
+      &quot;Embarked&quot;: &quot;number&quot;,
+      &quot;zero.17&quot;: &quot;bool&quot;,
+      &quot;zero.18&quot;: &quot;bool&quot;,
+      &quot;2urvived&quot;: &quot;bool&quot;
+    },
+    &quot;null_rate&quot;: {
+      &quot;Passengerid&quot;: 0.0,
+      &quot;Age&quot;: 0.0,
+      &quot;Fare&quot;: 0.0,
+      &quot;Sex&quot;: 0.0,
+      &quot;sibsp&quot;: 0.0,
+      &quot;zero&quot;: 0.0,
+      &quot;zero.1&quot;: 0.0,
+      &quot;zero.2&quot;: 0.0,
+      &quot;zero.3&quot;: 0.0,
+      &quot;zero.4&quot;: 0.0,
+      &quot;zero.5&quot;: 0.0,
+      &quot;zero.6&quot;: 0.0,
+      &quot;Parch&quot;: 0.0,
+      &quot;zero.7&quot;: 0.0,
+      &quot;zero.8&quot;: 0.0,
+      &quot;zero.9&quot;: 0.0,
+      &quot;zero.10&quot;: 0.0,
+      &quot;zero.11&quot;: 0.0,
+      &quot;zero.12&quot;: 0.0,
+      &quot;zero.13&quot;: 0.0,
+      &quot;zero.14&quot;: 0.0,
+      &quot;Pclass&quot;: 0.0,
+      &quot;zero.15&quot;: 0.0,
+      &quot;zero.16&quot;: 0.0,
+      &quot;Embarked&quot;: 0.0015278838808250573,
+      &quot;zero.17&quot;: 0.0,
+      &quot;zero.18&quot;: 0.0,
+      &quot;2urvived&quot;: 0.0
+    },
+    &quot;empty_string_rate&quot;: {
+      &quot;Passengerid&quot;: 0.0,
+      &quot;Age&quot;: 0.0,
+      &quot;Fare&quot;: 0.0,
+      &quot;Sex&quot;: 0.0,
+      &quot;sibsp&quot;: 0.0,
+      &quot;zero&quot;: 0.0,
+      &quot;zero.1&quot;: 0.0,
+      &quot;zero.2&quot;: 0.0,
+      &quot;zero.3&quot;: 0.0,
+      &quot;zero.4&quot;: 0.0,
+      &quot;zero.5&quot;: 0.0,
+      &quot;zero.6&quot;: 0.0,
+      &quot;Parch&quot;: 0.0,
+      &quot;zero.7&quot;: 0.0,
+      &quot;zero.8&quot;: 0.0,
+      &quot;zero.9&quot;: 0.0,
+      &quot;zero.10&quot;: 0.0,
+      &quot;zero.11&quot;: 0.0,
+      &quot;zero.12&quot;: 0.0,
+      &quot;zero.13&quot;: 0.0,
+      &quot;zero.14&quot;: 0.0,
+      &quot;Pclass&quot;: 0.0,
+      &quot;zero.15&quot;: 0.0,
+      &quot;zero.16&quot;: 0.0,
+      &quot;Embarked&quot;: 0.0,
+      &quot;zero.17&quot;: 0.0,
+      &quot;zero.18&quot;: 0.0,
+      &quot;2urvived&quot;: 0.0
+    },
+    &quot;distinct_count&quot;: {
+      &quot;Passengerid&quot;: 1309,
+      &quot;Age&quot;: 98,
+      &quot;Fare&quot;: 281,
+      &quot;Sex&quot;: 2,
+      &quot;sibsp&quot;: 7,
+      &quot;zero&quot;: 1,
+      &quot;zero.1&quot;: 1,
+      &quot;zero.2&quot;: 1,
+      &quot;zero.3&quot;: 1,
+      &quot;zero.4&quot;: 1,
+      &quot;zero.5&quot;: 1,
+      &quot;zero.6&quot;: 1,
+      &quot;Parch&quot;: 8,
+      &quot;zero.7&quot;: 1,
+      &quot;zero.8&quot;: 1,
+      &quot;zero.9&quot;: 1,
+      &quot;zero.10&quot;: 1,
+      &quot;zero.11&quot;: 1,
+      &quot;zero.12&quot;: 1,
+      &quot;zero.13&quot;: 1,
+      &quot;zero.14&quot;: 1,
+      &quot;Pclass&quot;: 3,
+      &quot;zero.15&quot;: 1,
+      &quot;zero.16&quot;: 1,
+      &quot;Embarked&quot;: 3,
+      &quot;zero.17&quot;: 1,
+      &quot;zero.18&quot;: 1,
+      &quot;2urvived&quot;: 2
+    },
+    &quot;numeric_stats&quot;: {
+      &quot;Passengerid&quot;: {
+        &quot;min&quot;: 1.0,
+        &quot;max&quot;: 1309.0,
+        &quot;mean&quot;: 655.0,
+        &quot;std&quot;: 378.0200611960517,
+        &quot;p25&quot;: 328.0,
+        &quot;p50&quot;: 655.0,
+        &quot;p75&quot;: 982.0
+      },
+      &quot;Age&quot;: {
+        &quot;min&quot;: 0.17,
+        &quot;max&quot;: 80.0,
+        &quot;mean&quot;: 29.50318563789152,
+        &quot;std&quot;: 12.905240585464622,
+        &quot;p25&quot;: 22.0,
+        &quot;p50&quot;: 28.0,
+        &quot;p75&quot;: 35.0
+      },
+      &quot;Fare&quot;: {
+        &quot;min&quot;: 0.0,
+        &quot;max&quot;: 512.3292,
+        &quot;mean&quot;: 33.28108563789152,
+        &quot;std&quot;: 51.74149976752607,
+        &quot;p25&quot;: 7.8958,
+        &quot;p50&quot;: 14.4542,
+        &quot;p75&quot;: 31.275
+      },
+      &quot;sibsp&quot;: {
+        &quot;min&quot;: 0.0,
+        &quot;max&quot;: 8.0,
+        &quot;mean&quot;: 0.4988540870893812,
+        &quot;std&quot;: 1.0416583905960977,
+        &quot;p25&quot;: 0.0,
+        &quot;p50&quot;: 0.0,
+        &quot;p75&quot;: 1.0
+      },
+      &quot;Parch&quot;: {
+        &quot;min&quot;: 0.0,
+        &quot;max&quot;: 9.0,
+        &quot;mean&quot;: 0.3850267379679144,
+        &quot;std&quot;: 0.8655602753495125,
+        &quot;p25&quot;: 0.0,
+        &quot;p50&quot;: 0.0,
+        &quot;p75&quot;: 0.0
+      },
+      &quot;Pclass&quot;: {
+        &quot;min&quot;: 1.0,
+        &quot;max&quot;: 3.0,
+        &quot;mean&quot;: 2.294881588999236,
+        &quot;std&quot;: 0.8378360189701319,
+        &quot;p25&quot;: 2.0,
+        &quot;p50&quot;: 3.0,
+        &quot;p75&quot;: 3.0
+      },
+      &quot;Embarked&quot;: {
+        &quot;min&quot;: 0.0,
+        &quot;max&quot;: 2.0,
+        &quot;mean&quot;: 1.4927314460596786,
+        &quot;std&quot;: 0.8146255675254218,
+        &quot;p25&quot;: 1.0,
+        &quot;p50&quot;: 2.0,
+        &quot;p75&quot;: 2.0
+      }
+    },
+    &quot;top_values&quot;: {
+      &quot;Passengerid&quot;: [],
+      &quot;Age&quot;: [],
+      &quot;Fare&quot;: [],
+      &quot;Sex&quot;: [
+        [
+          &quot;0&quot;,
+          843
+        ],
+        [
+          &quot;1&quot;,
+          466
+        ]
+      ],
+      &quot;sibsp&quot;: [],
+      &quot;zero&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.1&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.2&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.3&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.4&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.5&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.6&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;Parch&quot;: [],
+      &quot;zero.7&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.8&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.9&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.10&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.11&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.12&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.13&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.14&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;Pclass&quot;: [],
+      &quot;zero.15&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.16&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;Embarked&quot;: [],
+      &quot;zero.17&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;zero.18&quot;: [
+        [
+          &quot;0&quot;,
+          1309
+        ]
+      ],
+      &quot;2urvived&quot;: [
+        [
+          &quot;0&quot;,
+          967
+        ],
+        [
+          &quot;1&quot;,
+          342
+        ]
+      ]
+    },
+    &quot;parse_failure_rate&quot;: {
+      &quot;Passengerid&quot;: 0.0,
+      &quot;Age&quot;: 0.0,
+      &quot;Fare&quot;: 0.0,
+      &quot;Sex&quot;: 0.0,
+      &quot;sibsp&quot;: 0.0,
+      &quot;zero&quot;: 0.0,
+      &quot;zero.1&quot;: 0.0,
+      &quot;zero.2&quot;: 0.0,
+      &quot;zero.3&quot;: 0.0,
+      &quot;zero.4&quot;: 0.0,
+      &quot;zero.5&quot;: 0.0,
+      &quot;zero.6&quot;: 0.0,
+      &quot;Parch&quot;: 0.0,
+      &quot;zero.7&quot;: 0.0,
+      &quot;zero.8&quot;: 0.0,
+      &quot;zero.9&quot;: 0.0,
+      &quot;zero.10&quot;: 0.0,
+      &quot;zero.11&quot;: 0.0,
+      &quot;zero.12&quot;: 0.0,
+      &quot;zero.13&quot;: 0.0,
+      &quot;zero.14&quot;: 0.0,
+      &quot;Pclass&quot;: 0.0,
+      &quot;zero.15&quot;: 0.0,
+      &quot;zero.16&quot;: 0.0,
+      &quot;Embarked&quot;: 0.0,
+      &quot;zero.17&quot;: 0.0,
+      &quot;zero.18&quot;: 0.0,
+      &quot;2urvived&quot;: 0.0
+    }
+  },
+  &quot;checks&quot;: [
+    {
+      &quot;id&quot;: &quot;null_rates&quot;,
+      &quot;category&quot;: &quot;completeness&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.05,
+        &quot;threshold_fail&quot;: 0.1,
+        &quot;worst_null_rate&quot;: 0.0015278838808250573,
+        &quot;warn_columns&quot;: [],
+        &quot;fail_columns&quot;: []
+      },
+      &quot;recommendation&quot;: &quot;Investigate source/system gaps; consider imputation only after root-cause review.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;empty_strings&quot;,
+      &quot;category&quot;: &quot;completeness&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.02,
+        &quot;threshold_fail&quot;: 0.05,
+        &quot;worst_empty_string_rate&quot;: 0.0,
+        &quot;warn_columns&quot;: [],
+        &quot;fail_columns&quot;: []
+      },
+      &quot;recommendation&quot;: &quot;Trim strings and normalize blanks to NULL; fix upstream exporters where possible.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;parse_failures&quot;,
+      &quot;category&quot;: &quot;validity&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.01,
+        &quot;threshold_fail&quot;: 0.03,
+        &quot;worst_parse_failure_rate&quot;: 0.0,
+        &quot;warn_columns&quot;: [],
+        &quot;fail_columns&quot;: []
+      },
+      &quot;recommendation&quot;: &quot;Normalize formats upstream; enforce contracts or robust parsing before analytics.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;numeric_outliers_iqr&quot;,
+      &quot;category&quot;: &quot;validity&quot;,
+      &quot;score_0_1&quot;: 0.8306621349838637,
+      &quot;score_0_100&quot;: 83.06621349838636,
+      &quot;status&quot;: &quot;warn&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;details&quot;: {
+        &quot;threshold_warn&quot;: 0.02,
+        &quot;threshold_fail&quot;: 0.05,
+        &quot;worst_outlier_rate&quot;: 0.1306340718105424,
+        &quot;top_outlier_columns&quot;: [
+          [
+            &quot;Fare&quot;,
+            0.1306340718105424
+          ],
+          [
+            &quot;Age&quot;,
+            0.07715813598166539
+          ],
+          [
+            &quot;sibsp&quot;,
+            0.04354469060351413
+          ],
+          [
+            &quot;Passengerid&quot;,
+            0.0
+          ],
+          [
+            &quot;Pclass&quot;,
+            0.0
+          ],
+          [
+            &quot;Embarked&quot;,
+            0.0
+          ]
+        ],
+        &quot;heavy_tail_flags&quot;: {
+          &quot;Fare&quot;: [
+            &quot;skew=4.36&gt;2&quot;,
+            &quot;p99/p50=18.2&gt;10&quot;,
+            &quot;tail_spread_ratio=14.7&gt;10&quot;
+          ],
+          &quot;sibsp&quot;: [
+            &quot;skew=3.84&gt;2&quot;,
+            &quot;p99/p50=inf&gt;10&quot;
+          ],
+          &quot;Pclass&quot;: [
+            &quot;tail_spread_ratio=inf&gt;10&quot;
+          ],
+          &quot;Embarked&quot;: [
+            &quot;tail_spread_ratio=inf&gt;10&quot;
+          ]
+        },
+        &quot;strict_fail&quot;: false
+      },
+      &quot;recommendation&quot;: &quot;High IQR outlier rates often indicate skew/heavy tails (common in money/count data). Use the optional config to enforce strict failing, set per-column rules, or exclude columns from outlier scoring.&quot;
+    },
+    {
+      &quot;id&quot;: &quot;duplicate_rows&quot;,
+      &quot;category&quot;: &quot;uniqueness&quot;,
+      &quot;score_0_1&quot;: 1.0,
+      &quot;score_0_100&quot;: 100.0,
+      &quot;status&quot;: &quot;pass&quot;,
+      &quot;severity&quot;: &quot;medium&quot;,
+      &quot;weight&quot;: 1.0,
+      &quot;details&quot;: {
+        &quot;duplicate_row_rate&quot;: 0.0,
+        &quot;threshold_warn&quot;: 0.01,
+        &quot;threshold_fail&quot;: 0.03
+      },
+      &quot;recommendation&quot;: &quot;Identify duplicate-producing joins or reprocessing; dedupe using stable keys where appropriate.&quot;
+    }
+  ],
+  &quot;config_applied&quot;: {
+    &quot;weights&quot;: {
+      &quot;categories&quot;: {
+        &quot;completeness&quot;: 0.2,
+        &quot;validity&quot;: 0.2,
+        &quot;consistency&quot;: 0.15,
+        &quot;uniqueness&quot;: 0.1,
+        &quot;integrity&quot;: 0.15,
+        &quot;timeliness&quot;: 0.1,
+        &quot;drift&quot;: 0.1
+      }
+    },
+    &quot;thresholds&quot;: {
+      &quot;null_rate_warn&quot;: 0.05,
+      &quot;null_rate_fail&quot;: 0.1,
+      &quot;empty_string_warn&quot;: 0.02,
+      &quot;empty_string_fail&quot;: 0.05,
+      &quot;duplicate_row_warn&quot;: 0.01,
+      &quot;duplicate_row_fail&quot;: 0.03,
+      &quot;outlier_rate_warn&quot;: 0.02,
+      &quot;outlier_rate_fail&quot;: 0.05,
+      &quot;parse_failure_warn&quot;: 0.01,
+      &quot;parse_failure_fail&quot;: 0.03
+    }
+  },
+  &quot;friendly_summary&quot;: {
+    &quot;readiness&quot;: &quot;Ready for analytics&quot;,
+    &quot;top_issues&quot;: [
+      {
+        &quot;title&quot;: &quot;numeric_outliers_iqr&quot;,
+        &quot;status&quot;: &quot;Needs attention&quot;,
+        &quot;score&quot;: 83.06621349838636
+      }
+    ],
+    &quot;insights&quot;: [
+      {
+        &quot;title&quot;: &quot;Missing data&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some fields are missing values. The highest missing rate is 0.2%.&quot;,
+        &quot;why_it_matters&quot;: &quot;Missing values can break metrics, reduce trust, and bias analytics.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Confirm whether the missing fields are expected (optional) or should be required.&quot;,
+          &quot;If required, trace missingness back to the source system or ingestion step.&quot;,
+          &quot;Decide on a repair approach: backfill, mapping fixes, or controlled imputation.&quot;
+        ],
+        &quot;where_to_look&quot;: []
+      },
+      {
+        &quot;title&quot;: &quot;Blank text values&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some text fields are blank (empty strings). Worst blank rate is 0.0%.&quot;,
+        &quot;why_it_matters&quot;: &quot;Blank text can look like real data but behaves like missingness in analysis.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Normalize blanks to NULL during ingestion/cleaning.&quot;,
+          &quot;Trim whitespace and standardize placeholder values like &#x27;N/A&#x27;, &#x27;-&#x27;, &#x27;unknown&#x27;.&quot;
+        ],
+        &quot;where_to_look&quot;: []
+      },
+      {
+        &quot;title&quot;: &quot;Numbers/dates that don\u2019t parse cleanly&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some fields look like dates or numbers but don\u2019t parse reliably. Worst rate is 0.0%.&quot;,
+        &quot;why_it_matters&quot;: &quot;Parsing issues cause incorrect sorting, filtering, aggregations, and time logic.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Standardize formats at the source (date formats, decimal separators, currency symbols).&quot;,
+          &quot;Apply consistent casting rules in ingestion.&quot;,
+          &quot;Use config to enforce a schema for critical fields.&quot;
+        ],
+        &quot;where_to_look&quot;: []
+      },
+      {
+        &quot;title&quot;: &quot;Unusual numeric values (possible outliers)&quot;,
+        &quot;status&quot;: &quot;Needs attention&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;Some numeric fields have many unusual values. Highest rate is 13.1%.&quot;,
+        &quot;why_it_matters&quot;: &quot;This often happens with naturally skewed data (like prices/amounts). It can still be valid, but it may affect averages and models.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Spot-check the top fields for unit/format problems (e.g., cents vs dollars).&quot;,
+          &quot;If values are valid but skewed, consider using medians, robust stats, or winsorization for analytics.&quot;,
+          &quot;Use the optional config to tighten/loosen thresholds or exclude columns.&quot;
+        ],
+        &quot;where_to_look&quot;: [
+          &quot;Fare (13.1%)&quot;,
+          &quot;Age (7.7%)&quot;,
+          &quot;sibsp (4.4%)&quot;
+        ]
+      },
+      {
+        &quot;title&quot;: &quot;Duplicate rows&quot;,
+        &quot;status&quot;: &quot;Pass&quot;,
+        &quot;impact&quot;: &quot;Medium&quot;,
+        &quot;what_we_found&quot;: &quot;About 0.00% of rows appear duplicated.&quot;,
+        &quot;why_it_matters&quot;: &quot;Duplicates can inflate counts, sums, and rates.&quot;,
+        &quot;what_to_do_next&quot;: [
+          &quot;Check if the dataset is supposed to contain one row per entity/event.&quot;,
+          &quot;Look for accidental reprocessing or join explosions in the pipeline.&quot;,
+          &quot;Dedupe using a stable key if appropriate.&quot;
+        ],
+        &quot;where_to_look&quot;: []
+      }
+    ],
+    &quot;plain_language_notes&quot;: [
+      &quot;\u2018Needs attention\u2019 means it may impact analytics, but could be expected depending on your data.&quot;,
+      &quot;Use the optional config to enforce strict rules (required fields, ranges, allowed values, keys, freshness).&quot;
+    ]
+  }
+}</pre>
+  </div>
+
+  <script>
+    // Tabs
+    const tabButtons = document.querySelectorAll('.tabbtn');
+    const tabs = {
+      summary: document.getElementById('tab-summary'),
+      checks: document.getElementById('tab-checks'),
+      profile: document.getElementById('tab-profile'),
+      raw: document.getElementById('tab-raw'),
+    };
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        Object.values(tabs).forEach(t => t.classList.remove('active'));
+        const key = btn.getAttribute('data-tab');
+        tabs[key].classList.add('active');
+      });
+    });
+
+    // Filtering (Checks tab)
+    const statusFilter = document.getElementById('statusFilter');
+    const searchBox = document.getElementById('searchBox');
+    const table = document.getElementById('checksTable');
+    function applyFilters() {
+      const statusVal = statusFilter.value;
+      const q = (searchBox.value || '').toLowerCase();
+      const rows = table.querySelectorAll('tr[data-status]');
+      rows.forEach(r => {
+        const st = r.getAttribute('data-status');
+        const text = r.innerText.toLowerCase();
+        const statusOk = (statusVal === 'all') || (st === statusVal);
+        const searchOk = (!q) || text.includes(q);
+        r.style.display = (statusOk && searchOk) ? '' : 'none';
+      });
+    }
+    statusFilter.addEventListener('change', applyFilters);
+    searchBox.addEventListener('input', applyFilters);
+  </script>
+</body>
+</html>

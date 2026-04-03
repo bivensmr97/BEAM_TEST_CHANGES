@@ -1,0 +1,613 @@
+{
+  "dataset": "heptapod/titanic::train_and_test2.csv",
+  "run_ts_utc": "2026-01-13T02:40:41.318915+00:00",
+  "row_count": 1309,
+  "col_count": 28,
+  "overall_score": 98.30662134983864,
+  "grade": "A",
+  "category_scores": {
+    "completeness": 100.0,
+    "validity": 91.53310674919318,
+    "uniqueness": 100.0,
+    "consistency": 100.0,
+    "integrity": 100.0,
+    "timeliness": 100.0,
+    "drift": 100.0
+  },
+  "profile": {
+    "inferred_types": {
+      "Passengerid": "number",
+      "Age": "number",
+      "Fare": "number",
+      "Sex": "bool",
+      "sibsp": "number",
+      "zero": "bool",
+      "zero.1": "bool",
+      "zero.2": "bool",
+      "zero.3": "bool",
+      "zero.4": "bool",
+      "zero.5": "bool",
+      "zero.6": "bool",
+      "Parch": "number",
+      "zero.7": "bool",
+      "zero.8": "bool",
+      "zero.9": "bool",
+      "zero.10": "bool",
+      "zero.11": "bool",
+      "zero.12": "bool",
+      "zero.13": "bool",
+      "zero.14": "bool",
+      "Pclass": "number",
+      "zero.15": "bool",
+      "zero.16": "bool",
+      "Embarked": "number",
+      "zero.17": "bool",
+      "zero.18": "bool",
+      "2urvived": "bool"
+    },
+    "null_rate": {
+      "Passengerid": 0.0,
+      "Age": 0.0,
+      "Fare": 0.0,
+      "Sex": 0.0,
+      "sibsp": 0.0,
+      "zero": 0.0,
+      "zero.1": 0.0,
+      "zero.2": 0.0,
+      "zero.3": 0.0,
+      "zero.4": 0.0,
+      "zero.5": 0.0,
+      "zero.6": 0.0,
+      "Parch": 0.0,
+      "zero.7": 0.0,
+      "zero.8": 0.0,
+      "zero.9": 0.0,
+      "zero.10": 0.0,
+      "zero.11": 0.0,
+      "zero.12": 0.0,
+      "zero.13": 0.0,
+      "zero.14": 0.0,
+      "Pclass": 0.0,
+      "zero.15": 0.0,
+      "zero.16": 0.0,
+      "Embarked": 0.0015278838808250573,
+      "zero.17": 0.0,
+      "zero.18": 0.0,
+      "2urvived": 0.0
+    },
+    "empty_string_rate": {
+      "Passengerid": 0.0,
+      "Age": 0.0,
+      "Fare": 0.0,
+      "Sex": 0.0,
+      "sibsp": 0.0,
+      "zero": 0.0,
+      "zero.1": 0.0,
+      "zero.2": 0.0,
+      "zero.3": 0.0,
+      "zero.4": 0.0,
+      "zero.5": 0.0,
+      "zero.6": 0.0,
+      "Parch": 0.0,
+      "zero.7": 0.0,
+      "zero.8": 0.0,
+      "zero.9": 0.0,
+      "zero.10": 0.0,
+      "zero.11": 0.0,
+      "zero.12": 0.0,
+      "zero.13": 0.0,
+      "zero.14": 0.0,
+      "Pclass": 0.0,
+      "zero.15": 0.0,
+      "zero.16": 0.0,
+      "Embarked": 0.0,
+      "zero.17": 0.0,
+      "zero.18": 0.0,
+      "2urvived": 0.0
+    },
+    "distinct_count": {
+      "Passengerid": 1309,
+      "Age": 98,
+      "Fare": 281,
+      "Sex": 2,
+      "sibsp": 7,
+      "zero": 1,
+      "zero.1": 1,
+      "zero.2": 1,
+      "zero.3": 1,
+      "zero.4": 1,
+      "zero.5": 1,
+      "zero.6": 1,
+      "Parch": 8,
+      "zero.7": 1,
+      "zero.8": 1,
+      "zero.9": 1,
+      "zero.10": 1,
+      "zero.11": 1,
+      "zero.12": 1,
+      "zero.13": 1,
+      "zero.14": 1,
+      "Pclass": 3,
+      "zero.15": 1,
+      "zero.16": 1,
+      "Embarked": 3,
+      "zero.17": 1,
+      "zero.18": 1,
+      "2urvived": 2
+    },
+    "numeric_stats": {
+      "Passengerid": {
+        "min": 1.0,
+        "max": 1309.0,
+        "mean": 655.0,
+        "std": 378.0200611960517,
+        "p25": 328.0,
+        "p50": 655.0,
+        "p75": 982.0
+      },
+      "Age": {
+        "min": 0.17,
+        "max": 80.0,
+        "mean": 29.50318563789152,
+        "std": 12.905240585464622,
+        "p25": 22.0,
+        "p50": 28.0,
+        "p75": 35.0
+      },
+      "Fare": {
+        "min": 0.0,
+        "max": 512.3292,
+        "mean": 33.28108563789152,
+        "std": 51.74149976752607,
+        "p25": 7.8958,
+        "p50": 14.4542,
+        "p75": 31.275
+      },
+      "sibsp": {
+        "min": 0.0,
+        "max": 8.0,
+        "mean": 0.4988540870893812,
+        "std": 1.0416583905960977,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 1.0
+      },
+      "Parch": {
+        "min": 0.0,
+        "max": 9.0,
+        "mean": 0.3850267379679144,
+        "std": 0.8655602753495125,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0
+      },
+      "Pclass": {
+        "min": 1.0,
+        "max": 3.0,
+        "mean": 2.294881588999236,
+        "std": 0.8378360189701319,
+        "p25": 2.0,
+        "p50": 3.0,
+        "p75": 3.0
+      },
+      "Embarked": {
+        "min": 0.0,
+        "max": 2.0,
+        "mean": 1.4927314460596786,
+        "std": 0.8146255675254218,
+        "p25": 1.0,
+        "p50": 2.0,
+        "p75": 2.0
+      }
+    },
+    "top_values": {
+      "Passengerid": [],
+      "Age": [],
+      "Fare": [],
+      "Sex": [
+        [
+          "0",
+          843
+        ],
+        [
+          "1",
+          466
+        ]
+      ],
+      "sibsp": [],
+      "zero": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.1": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.2": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.3": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.4": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.5": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.6": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "Parch": [],
+      "zero.7": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.8": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.9": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.10": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.11": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.12": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.13": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.14": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "Pclass": [],
+      "zero.15": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.16": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "Embarked": [],
+      "zero.17": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "zero.18": [
+        [
+          "0",
+          1309
+        ]
+      ],
+      "2urvived": [
+        [
+          "0",
+          967
+        ],
+        [
+          "1",
+          342
+        ]
+      ]
+    },
+    "parse_failure_rate": {
+      "Passengerid": 0.0,
+      "Age": 0.0,
+      "Fare": 0.0,
+      "Sex": 0.0,
+      "sibsp": 0.0,
+      "zero": 0.0,
+      "zero.1": 0.0,
+      "zero.2": 0.0,
+      "zero.3": 0.0,
+      "zero.4": 0.0,
+      "zero.5": 0.0,
+      "zero.6": 0.0,
+      "Parch": 0.0,
+      "zero.7": 0.0,
+      "zero.8": 0.0,
+      "zero.9": 0.0,
+      "zero.10": 0.0,
+      "zero.11": 0.0,
+      "zero.12": 0.0,
+      "zero.13": 0.0,
+      "zero.14": 0.0,
+      "Pclass": 0.0,
+      "zero.15": 0.0,
+      "zero.16": 0.0,
+      "Embarked": 0.0,
+      "zero.17": 0.0,
+      "zero.18": 0.0,
+      "2urvived": 0.0
+    }
+  },
+  "checks": [
+    {
+      "id": "null_rates",
+      "category": "completeness",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "details": {
+        "threshold_warn": 0.05,
+        "threshold_fail": 0.1,
+        "worst_null_rate": 0.0015278838808250573,
+        "warn_columns": [],
+        "fail_columns": []
+      },
+      "recommendation": "Investigate source/system gaps; consider imputation only after root-cause review."
+    },
+    {
+      "id": "empty_strings",
+      "category": "completeness",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "details": {
+        "threshold_warn": 0.02,
+        "threshold_fail": 0.05,
+        "worst_empty_string_rate": 0.0,
+        "warn_columns": [],
+        "fail_columns": []
+      },
+      "recommendation": "Trim strings and normalize blanks to NULL; fix upstream exporters where possible."
+    },
+    {
+      "id": "parse_failures",
+      "category": "validity",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "details": {
+        "threshold_warn": 0.01,
+        "threshold_fail": 0.03,
+        "worst_parse_failure_rate": 0.0,
+        "warn_columns": [],
+        "fail_columns": []
+      },
+      "recommendation": "Normalize formats upstream; enforce contracts or robust parsing before analytics."
+    },
+    {
+      "id": "numeric_outliers_iqr",
+      "category": "validity",
+      "score_0_1": 0.8306621349838637,
+      "score_0_100": 83.06621349838636,
+      "status": "warn",
+      "severity": "medium",
+      "weight": 1.0,
+      "details": {
+        "threshold_warn": 0.02,
+        "threshold_fail": 0.05,
+        "worst_outlier_rate": 0.1306340718105424,
+        "top_outlier_columns": [
+          [
+            "Fare",
+            0.1306340718105424
+          ],
+          [
+            "Age",
+            0.07715813598166539
+          ],
+          [
+            "sibsp",
+            0.04354469060351413
+          ],
+          [
+            "Passengerid",
+            0.0
+          ],
+          [
+            "Pclass",
+            0.0
+          ],
+          [
+            "Embarked",
+            0.0
+          ]
+        ],
+        "heavy_tail_flags": {
+          "Fare": [
+            "skew=4.36>2",
+            "p99/p50=18.2>10",
+            "tail_spread_ratio=14.7>10"
+          ],
+          "sibsp": [
+            "skew=3.84>2",
+            "p99/p50=inf>10"
+          ],
+          "Pclass": [
+            "tail_spread_ratio=inf>10"
+          ],
+          "Embarked": [
+            "tail_spread_ratio=inf>10"
+          ]
+        },
+        "strict_fail": false
+      },
+      "recommendation": "High IQR outlier rates often indicate skew/heavy tails (common in money/count data). Use the optional config to enforce strict failing, set per-column rules, or exclude columns from outlier scoring."
+    },
+    {
+      "id": "duplicate_rows",
+      "category": "uniqueness",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "details": {
+        "duplicate_row_rate": 0.0,
+        "threshold_warn": 0.01,
+        "threshold_fail": 0.03
+      },
+      "recommendation": "Identify duplicate-producing joins or reprocessing; dedupe using stable keys where appropriate."
+    }
+  ],
+  "config_applied": {
+    "weights": {
+      "categories": {
+        "completeness": 0.2,
+        "validity": 0.2,
+        "consistency": 0.15,
+        "uniqueness": 0.1,
+        "integrity": 0.15,
+        "timeliness": 0.1,
+        "drift": 0.1
+      }
+    },
+    "thresholds": {
+      "null_rate_warn": 0.05,
+      "null_rate_fail": 0.1,
+      "empty_string_warn": 0.02,
+      "empty_string_fail": 0.05,
+      "duplicate_row_warn": 0.01,
+      "duplicate_row_fail": 0.03,
+      "outlier_rate_warn": 0.02,
+      "outlier_rate_fail": 0.05,
+      "parse_failure_warn": 0.01,
+      "parse_failure_fail": 0.03
+    }
+  },
+  "friendly_summary": {
+    "readiness": "Ready for analytics",
+    "top_issues": [
+      {
+        "title": "numeric_outliers_iqr",
+        "status": "Needs attention",
+        "score": 83.06621349838636
+      }
+    ],
+    "insights": [
+      {
+        "title": "Missing data",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "Some fields are missing values. The highest missing rate is 0.2%.",
+        "why_it_matters": "Missing values can break metrics, reduce trust, and bias analytics.",
+        "what_to_do_next": [
+          "Confirm whether the missing fields are expected (optional) or should be required.",
+          "If required, trace missingness back to the source system or ingestion step.",
+          "Decide on a repair approach: backfill, mapping fixes, or controlled imputation."
+        ],
+        "where_to_look": []
+      },
+      {
+        "title": "Blank text values",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "Some text fields are blank (empty strings). Worst blank rate is 0.0%.",
+        "why_it_matters": "Blank text can look like real data but behaves like missingness in analysis.",
+        "what_to_do_next": [
+          "Normalize blanks to NULL during ingestion/cleaning.",
+          "Trim whitespace and standardize placeholder values like 'N/A', '-', 'unknown'."
+        ],
+        "where_to_look": []
+      },
+      {
+        "title": "Numbers/dates that don\u2019t parse cleanly",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "Some fields look like dates or numbers but don\u2019t parse reliably. Worst rate is 0.0%.",
+        "why_it_matters": "Parsing issues cause incorrect sorting, filtering, aggregations, and time logic.",
+        "what_to_do_next": [
+          "Standardize formats at the source (date formats, decimal separators, currency symbols).",
+          "Apply consistent casting rules in ingestion.",
+          "Use config to enforce a schema for critical fields."
+        ],
+        "where_to_look": []
+      },
+      {
+        "title": "Unusual numeric values (possible outliers)",
+        "status": "Needs attention",
+        "impact": "Medium",
+        "what_we_found": "Some numeric fields have many unusual values. Highest rate is 13.1%.",
+        "why_it_matters": "This often happens with naturally skewed data (like prices/amounts). It can still be valid, but it may affect averages and models.",
+        "what_to_do_next": [
+          "Spot-check the top fields for unit/format problems (e.g., cents vs dollars).",
+          "If values are valid but skewed, consider using medians, robust stats, or winsorization for analytics.",
+          "Use the optional config to tighten/loosen thresholds or exclude columns."
+        ],
+        "where_to_look": [
+          "Fare (13.1%)",
+          "Age (7.7%)",
+          "sibsp (4.4%)"
+        ]
+      },
+      {
+        "title": "Duplicate rows",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "About 0.00% of rows appear duplicated.",
+        "why_it_matters": "Duplicates can inflate counts, sums, and rates.",
+        "what_to_do_next": [
+          "Check if the dataset is supposed to contain one row per entity/event.",
+          "Look for accidental reprocessing or join explosions in the pipeline.",
+          "Dedupe using a stable key if appropriate."
+        ],
+        "where_to_look": []
+      }
+    ],
+    "plain_language_notes": [
+      "\u2018Needs attention\u2019 means it may impact analytics, but could be expected depending on your data.",
+      "Use the optional config to enforce strict rules (required fields, ranges, allowed values, keys, freshness)."
+    ]
+  }
+}

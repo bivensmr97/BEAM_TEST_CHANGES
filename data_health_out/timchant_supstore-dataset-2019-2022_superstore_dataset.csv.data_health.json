@@ -1,0 +1,654 @@
+{
+  "version": "0.2.0",
+  "dataset": "timchant/supstore-dataset-2019-2022::superstore_dataset.csv",
+  "run_ts_utc": "2026-01-27T02:10:16.408703+00:00",
+  "row_count": 9994,
+  "col_count": 19,
+  "overall_score": 97.4253123302553,
+  "grade": "A",
+  "category_scores": {
+    "completeness": 100.0,
+    "validity": 87.12656165127648,
+    "uniqueness": 100.0,
+    "consistency": 100.0,
+    "integrity": 100.0,
+    "timeliness": 100.0,
+    "drift": 100.0
+  },
+  "profile": {
+    "profile_sampled": false,
+    "inferred_types": {
+      "order_id": "string",
+      "order_date": "date",
+      "ship_date": "date",
+      "customer": "string",
+      "manufactory": "category",
+      "product_name": "string",
+      "segment": "category",
+      "category": "category",
+      "subcategory": "category",
+      "region": "category",
+      "zip": "number",
+      "city": "string",
+      "state": "category",
+      "country": "category",
+      "discount": "number",
+      "profit": "number",
+      "quantity": "number",
+      "sales": "number",
+      "profit_margin": "number"
+    },
+    "null_rate": {
+      "order_id": 0.0,
+      "order_date": 0.0,
+      "ship_date": 0.0,
+      "customer": 0.0,
+      "manufactory": 0.0,
+      "product_name": 0.0,
+      "segment": 0.0,
+      "category": 0.0,
+      "subcategory": 0.0,
+      "region": 0.0,
+      "zip": 0.0,
+      "city": 0.0,
+      "state": 0.0,
+      "country": 0.0,
+      "discount": 0.0,
+      "profit": 0.0,
+      "quantity": 0.0,
+      "sales": 0.0,
+      "profit_margin": 0.0
+    },
+    "empty_string_rate": {
+      "order_id": 0.0,
+      "order_date": 0.0,
+      "ship_date": 0.0,
+      "customer": 0.0,
+      "manufactory": 0.0,
+      "product_name": 0.0,
+      "segment": 0.0,
+      "category": 0.0,
+      "subcategory": 0.0,
+      "region": 0.0,
+      "zip": 0.0,
+      "city": 0.0,
+      "state": 0.0,
+      "country": 0.0,
+      "discount": 0.0,
+      "profit": 0.0,
+      "quantity": 0.0,
+      "sales": 0.0,
+      "profit_margin": 0.0
+    },
+    "distinct_count": {
+      "order_id": 5009,
+      "order_date": 1236,
+      "ship_date": 1334,
+      "customer": 793,
+      "manufactory": 182,
+      "product_name": 1849,
+      "segment": 3,
+      "category": 3,
+      "subcategory": 17,
+      "region": 4,
+      "zip": 631,
+      "city": 531,
+      "state": 49,
+      "country": 1,
+      "discount": 12,
+      "profit": 7287,
+      "quantity": 14,
+      "sales": 5825,
+      "profit_margin": 288
+    },
+    "numeric_stats": {
+      "order_id": {},
+      "order_date": {},
+      "ship_date": {},
+      "customer": {},
+      "manufactory": {},
+      "product_name": {},
+      "segment": {},
+      "category": {},
+      "subcategory": {},
+      "region": {},
+      "zip": {
+        "min": 1040.0,
+        "max": 99301.0,
+        "mean": 55190.37172303382,
+        "std": 32063.705314666506,
+        "p25": 23223.0,
+        "p50": 56430.5,
+        "p75": 90008.0
+      },
+      "city": {},
+      "state": {},
+      "country": {},
+      "discount": {
+        "min": 0.0,
+        "max": 0.8,
+        "mean": 0.15620272163297977,
+        "std": 0.20645196782569636,
+        "p25": 0.0,
+        "p50": 0.2,
+        "p75": 0.2
+      },
+      "profit": {
+        "min": -6599.978,
+        "max": 8399.976,
+        "mean": 28.656896307784674,
+        "std": 234.26010769095754,
+        "p25": 1.72875,
+        "p50": 8.6665,
+        "p75": 29.364
+      },
+      "quantity": {
+        "min": 1.0,
+        "max": 14.0,
+        "mean": 3.789573744246548,
+        "std": 2.2251096911414243,
+        "p25": 2.0,
+        "p50": 3.0,
+        "p75": 5.0
+      },
+      "sales": {
+        "min": 0.444,
+        "max": 22638.48,
+        "mean": 229.85800083049827,
+        "std": 623.245100508682,
+        "p25": 17.28,
+        "p50": 54.489999999999995,
+        "p75": 209.94
+      },
+      "profit_margin": {
+        "min": -2.75,
+        "max": 0.5,
+        "mean": 0.12031392972173303,
+        "std": 0.46675434522462733,
+        "p25": 0.075,
+        "p50": 0.27,
+        "p75": 0.3625
+      }
+    },
+    "top_values": {
+      "order_id": [],
+      "order_date": [],
+      "ship_date": [],
+      "customer": [
+        [
+          "William Brown",
+          37
+        ],
+        [
+          "Paul Prost",
+          34
+        ],
+        [
+          "Matt Abelman",
+          34
+        ],
+        [
+          "John Lee",
+          34
+        ],
+        [
+          "Seth Vernon",
+          32
+        ]
+      ],
+      "manufactory": [
+        [
+          "Other",
+          1893
+        ],
+        [
+          "Xerox",
+          859
+        ],
+        [
+          "Avery",
+          557
+        ],
+        [
+          "GBC",
+          332
+        ],
+        [
+          "Global",
+          291
+        ]
+      ],
+      "product_name": [
+        [
+          "Staple envelope",
+          48
+        ],
+        [
+          "Staples",
+          46
+        ],
+        [
+          "Easy-staple paper",
+          46
+        ],
+        [
+          "Avery Non-Stick Binders",
+          20
+        ],
+        [
+          "Staples in misc. colors",
+          19
+        ]
+      ],
+      "segment": [
+        [
+          "Consumer",
+          5191
+        ],
+        [
+          "Corporate",
+          3020
+        ],
+        [
+          "Home Office",
+          1783
+        ]
+      ],
+      "category": [
+        [
+          "Office Supplies",
+          6026
+        ],
+        [
+          "Furniture",
+          2121
+        ],
+        [
+          "Technology",
+          1847
+        ]
+      ],
+      "subcategory": [
+        [
+          "Binders",
+          1523
+        ],
+        [
+          "Paper",
+          1370
+        ],
+        [
+          "Furnishings",
+          957
+        ],
+        [
+          "Phones",
+          889
+        ],
+        [
+          "Storage",
+          846
+        ]
+      ],
+      "region": [
+        [
+          "West",
+          3203
+        ],
+        [
+          "East",
+          2848
+        ],
+        [
+          "Central",
+          2323
+        ],
+        [
+          "South",
+          1620
+        ]
+      ],
+      "zip": [],
+      "city": [
+        [
+          "New York City",
+          915
+        ],
+        [
+          "Los Angeles",
+          747
+        ],
+        [
+          "Philadelphia",
+          537
+        ],
+        [
+          "San Francisco",
+          510
+        ],
+        [
+          "Seattle",
+          428
+        ]
+      ],
+      "state": [
+        [
+          "California",
+          2001
+        ],
+        [
+          "New York",
+          1128
+        ],
+        [
+          "Texas",
+          985
+        ],
+        [
+          "Pennsylvania",
+          587
+        ],
+        [
+          "Washington",
+          506
+        ]
+      ],
+      "country": [
+        [
+          "United States",
+          9994
+        ]
+      ],
+      "discount": [],
+      "profit": [],
+      "quantity": [],
+      "sales": [],
+      "profit_margin": []
+    },
+    "parse_failure_rate": {
+      "order_id": 0.0,
+      "order_date": 0.0,
+      "ship_date": 0.0,
+      "customer": 0.0,
+      "manufactory": 0.0,
+      "product_name": 0.0,
+      "segment": 0.0,
+      "category": 0.0,
+      "subcategory": 0.0,
+      "region": 0.0,
+      "zip": 0.0,
+      "city": 0.0,
+      "state": 0.0,
+      "country": 0.0,
+      "discount": 0.0,
+      "profit": 0.0,
+      "quantity": 0.0,
+      "sales": 0.0,
+      "profit_margin": 0.0
+    }
+  },
+  "checks": [
+    {
+      "id": "null_rates",
+      "display_name": "Missing values",
+      "category": "completeness",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "estimated": false,
+      "details": {
+        "threshold_warn": 0.05,
+        "threshold_fail": 0.1,
+        "worst_null_rate": 0.0,
+        "warn_columns": [],
+        "fail_columns": []
+      },
+      "recommendation": "Investigate source/system gaps; consider imputation only after root-cause review."
+    },
+    {
+      "id": "empty_strings",
+      "display_name": "Blank text values",
+      "category": "completeness",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "estimated": false,
+      "details": {
+        "threshold_warn": 0.02,
+        "threshold_fail": 0.05,
+        "worst_empty_string_rate": 0.0,
+        "warn_columns": [],
+        "fail_columns": []
+      },
+      "recommendation": "Trim strings and normalize blanks to NULL; fix upstream exporters where possible."
+    },
+    {
+      "id": "parse_failures",
+      "display_name": "Numbers/dates that don't parse cleanly",
+      "category": "validity",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "estimated": false,
+      "details": {
+        "threshold_warn": 0.01,
+        "threshold_fail": 0.03,
+        "worst_parse_failure_rate": 0.0,
+        "warn_columns": [],
+        "fail_columns": []
+      },
+      "recommendation": "Normalize formats upstream; enforce schema contracts or robust parsing before analytics."
+    },
+    {
+      "id": "numeric_outliers_iqr",
+      "display_name": "Unusual numeric values (possible outliers)",
+      "category": "validity",
+      "score_0_1": 0.7425312330255296,
+      "score_0_100": 74.25312330255296,
+      "status": "warn",
+      "severity": "medium",
+      "weight": 1.0,
+      "estimated": false,
+      "details": {
+        "threshold_warn": 0.02,
+        "threshold_fail": 0.05,
+        "worst_outlier_rate": 0.188212927756654,
+        "top_outlier_columns": [
+          [
+            "profit",
+            0.188212927756654
+          ],
+          [
+            "sales",
+            0.11677006203722233
+          ],
+          [
+            "profit_margin",
+            0.09525715429257554
+          ],
+          [
+            "discount",
+            0.0856513908345007
+          ],
+          [
+            "quantity",
+            0.017010206123674206
+          ],
+          [
+            "zip",
+            0.0
+          ]
+        ],
+        "heavy_tail_flags": {
+          "discount": [
+            "tail_spread_ratio=inf>10"
+          ],
+          "profit": [
+            "skew=7.56>2",
+            "p99/p50=67.0>10",
+            "tail_spread_ratio=27.6>10"
+          ],
+          "sales": [
+            "skew=12.97>2",
+            "p99/p50=45.5>10",
+            "tail_spread_ratio=15.6>10"
+          ]
+        },
+        "strict_fail": false
+      },
+      "recommendation": "High outlier rates are common in money/count data. Spot-check units (cents vs dollars), then decide whether to use robust stats (medians), winsorization, or config exclusions."
+    },
+    {
+      "id": "duplicate_rows",
+      "display_name": "Duplicate rows",
+      "category": "uniqueness",
+      "score_0_1": 1.0,
+      "score_0_100": 100.0,
+      "status": "pass",
+      "severity": "medium",
+      "weight": 1.0,
+      "estimated": false,
+      "details": {
+        "duplicate_row_rate": 0.00020012007204322593,
+        "threshold_warn": 0.01,
+        "threshold_fail": 0.03,
+        "sampled": false,
+        "sample_size": null
+      },
+      "recommendation": "Identify duplicate-producing joins or reprocessing; dedupe using stable keys where appropriate."
+    }
+  ],
+  "config_applied": {
+    "weights": {
+      "categories": {
+        "completeness": 0.2,
+        "validity": 0.2,
+        "consistency": 0.15,
+        "uniqueness": 0.1,
+        "integrity": 0.15,
+        "timeliness": 0.1,
+        "drift": 0.1
+      }
+    },
+    "thresholds": {
+      "null_rate_warn": 0.05,
+      "null_rate_fail": 0.1,
+      "empty_string_warn": 0.02,
+      "empty_string_fail": 0.05,
+      "duplicate_row_warn": 0.01,
+      "duplicate_row_fail": 0.03,
+      "outlier_rate_warn": 0.02,
+      "outlier_rate_fail": 0.05,
+      "parse_failure_warn": 0.01,
+      "parse_failure_fail": 0.03
+    },
+    "runtime": {
+      "max_rows_profile": 200000,
+      "type_infer_sample": 10000,
+      "duplicate_sample": 200000,
+      "outlier_sample": 200000,
+      "sample_top_values": 5,
+      "max_top_value_uniques": 5000,
+      "random_state": 42
+    }
+  },
+  "friendly_summary": {
+    "readiness": "Ready for analytics",
+    "top_issues": [
+      {
+        "title": "Unusual numeric values (possible outliers)",
+        "id": "numeric_outliers_iqr",
+        "status": "Needs attention",
+        "severity": "Medium",
+        "score": 74.25312330255296,
+        "estimated": false
+      }
+    ],
+    "insights": [
+      {
+        "title": "Missing values",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "Some fields are missing values. The highest missing rate is 0.0%.",
+        "why_it_matters": "Missing values can break metrics, reduce trust, and bias analytics.",
+        "what_to_do_next": [
+          "Confirm whether missing fields are expected (optional) or should be required.",
+          "Trace missingness back to the source system or ingestion step.",
+          "Choose a repair approach: backfill, mapping fixes, or controlled imputation."
+        ],
+        "where_to_look": [],
+        "estimated": false
+      },
+      {
+        "title": "Blank text values",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "Some text fields are blank (empty strings). Worst blank rate is 0.0%.",
+        "why_it_matters": "Blank text can look like real data but behaves like missingness in analysis.",
+        "what_to_do_next": [
+          "Normalize blanks to NULL during ingestion/cleaning.",
+          "Trim whitespace and standardize placeholders like 'N/A', '-', 'unknown'."
+        ],
+        "where_to_look": [],
+        "estimated": false
+      },
+      {
+        "title": "Numbers/dates that don't parse cleanly",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "Some fields look like dates or numbers but don\u2019t parse reliably. Worst rate is 0.0%.",
+        "why_it_matters": "Parsing issues cause incorrect sorting, filtering, and aggregations.",
+        "what_to_do_next": [
+          "Standardize formats at the source (dates, currency symbols, decimals).",
+          "Apply consistent casting rules during ingestion.",
+          "Use config to enforce schema for critical fields."
+        ],
+        "where_to_look": [],
+        "estimated": false
+      },
+      {
+        "title": "Unusual numeric values (possible outliers)",
+        "status": "Needs attention",
+        "impact": "Medium",
+        "what_we_found": "Some numeric fields have many unusual values. Highest rate is 18.8%.",
+        "why_it_matters": "This can indicate unit issues or valid skew (prices/amounts). Either way it affects averages and models.",
+        "what_to_do_next": [
+          "Spot-check top fields for unit/format problems (cents vs dollars).",
+          "If valid but skewed, consider medians/robust stats in dashboards.",
+          "Use config to tighten/loosen thresholds or exclude columns."
+        ],
+        "where_to_look": [
+          "profit (18.8%)",
+          "sales (11.7%)",
+          "profit_margin (9.5%)"
+        ],
+        "estimated": false
+      },
+      {
+        "title": "Duplicate rows",
+        "status": "Pass",
+        "impact": "Medium",
+        "what_we_found": "About 0.02% of rows appear duplicated.",
+        "why_it_matters": "Duplicates can inflate counts, sums, and conversion rates.",
+        "what_to_do_next": [
+          "Confirm expected grain (one row per order/event/entity).",
+          "Look for reprocessing or join explosions.",
+          "Dedupe using a stable key if appropriate."
+        ],
+        "where_to_look": [],
+        "estimated": false
+      }
+    ],
+    "plain_language_notes": [
+      "\u2018Needs attention\u2019 means it may impact analytics, but could be expected depending on your data.",
+      "Checks marked \u2018estimated\u2019 were computed on a sample for speed (good for triage).",
+      "Use config to enforce strict rules (required fields, keys, timeliness, and safe cross-field rules)."
+    ]
+  }
+}
