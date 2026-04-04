@@ -8,8 +8,10 @@ from datetime import datetime
 import re
 import math
 import io
+import json as _json
 import pandas as pd
 import numpy as np
+import plotly.express as px
 from urllib.parse import quote
 
 from azure.storage.blob import BlobServiceClient
@@ -712,3 +714,168 @@ def file_health(
         total_columns=n_cols,
         duplicate_count=duplicate_count,
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /custom-charts — user-configured dashboard charts
+# ---------------------------------------------------------------------------
+
+class ChartRequest(BaseModel):
+    id: str
+    chart_type: str = "bar"       # bar | line | scatter | histogram | box | pie
+    x: Optional[str] = None
+    y: Optional[str] = None
+    agg: str = "count"            # count | sum | mean | median
+    color_by: Optional[str] = None
+    title: Optional[str] = None
+
+
+class CustomDashboardIn(BaseModel):
+    charts: List[ChartRequest] = []
+    filters: Optional[Dict[str, Optional[str]]] = {}
+
+
+_MAX_SCATTER_PTS = 8_000
+_MAX_CATS        = 30
+_MAX_PIE_SLICES  = 15
+
+
+def _build_chart(df: pd.DataFrame, req: ChartRequest) -> Optional[dict]:
+    """Return a Plotly figure serialised as a plain dict, or None on failure."""
+    x_col    = req.x      if req.x      and req.x      in df.columns else None
+    y_col    = req.y      if req.y      and req.y      in df.columns else None
+    color_col = req.color_by if req.color_by and req.color_by in df.columns else None
+    agg       = req.agg or "count"
+
+    try:
+        fig = None
+
+        # ── Histogram ──────────────────────────────────────────────────────────
+        if req.chart_type == "histogram":
+            if not x_col:
+                return None
+            s = df[x_col].dropna()
+            if not pd.api.types.is_numeric_dtype(s):
+                return None
+            p99 = float(s.quantile(0.99))
+            s = s[s <= p99]
+            fig = px.histogram(s.rename(x_col).to_frame(), x=x_col, nbins=40)
+            fig.update_layout(bargap=0.05)
+
+        # ── Bar ────────────────────────────────────────────────────────────────
+        elif req.chart_type == "bar":
+            if not x_col:
+                return None
+            grp = [x_col] + ([color_col] if color_col else [])
+            if y_col and pd.api.types.is_numeric_dtype(df[y_col]):
+                agg_fns = {"mean": "mean", "median": "median", "sum": "sum"}
+                if agg in agg_fns:
+                    agg_df = df.groupby(grp)[y_col].agg(agg_fns[agg]).reset_index()
+                else:
+                    agg_df = df.groupby(grp).size().reset_index(name=y_col)
+                top = df[x_col].value_counts().head(_MAX_CATS).index
+                agg_df = agg_df[agg_df[x_col].isin(top)]
+                fig = px.bar(agg_df, x=x_col, y=y_col, color=color_col, barmode="group")
+            else:
+                vc = df[x_col].value_counts().head(_MAX_CATS).reset_index()
+                vc.columns = [x_col, "count"]
+                fig = px.bar(vc, x=x_col, y="count", color=color_col)
+
+        # ── Line ───────────────────────────────────────────────────────────────
+        elif req.chart_type == "line":
+            if not x_col or not y_col:
+                return None
+            if not pd.api.types.is_numeric_dtype(df[y_col]):
+                return None
+            grp = [x_col] + ([color_col] if color_col else [])
+            line_df = df.groupby(grp)[y_col].mean().reset_index()
+            line_df = line_df.sort_values(x_col)
+            fig = px.line(line_df, x=x_col, y=y_col, color=color_col)
+
+        # ── Scatter ────────────────────────────────────────────────────────────
+        elif req.chart_type == "scatter":
+            if not x_col or not y_col:
+                return None
+            if not pd.api.types.is_numeric_dtype(df[x_col]) or \
+               not pd.api.types.is_numeric_dtype(df[y_col]):
+                return None
+            cols_needed = [x_col, y_col] + ([color_col] if color_col else [])
+            plot_df = df[cols_needed].dropna()
+            if len(plot_df) > _MAX_SCATTER_PTS:
+                plot_df = plot_df.sample(_MAX_SCATTER_PTS, random_state=42)
+            fig = px.scatter(plot_df, x=x_col, y=y_col, color=color_col,
+                             opacity=0.65, trendline=None)
+
+        # ── Box ────────────────────────────────────────────────────────────────
+        elif req.chart_type == "box":
+            if not y_col:
+                return None
+            if not pd.api.types.is_numeric_dtype(df[y_col]):
+                return None
+            cols_needed = [y_col] + ([x_col] if x_col else []) + \
+                          ([color_col] if color_col else [])
+            plot_df = df[cols_needed].dropna()
+            # Limit categories if x is categorical
+            if x_col:
+                top = df[x_col].value_counts().head(_MAX_CATS).index
+                plot_df = plot_df[plot_df[x_col].isin(top)]
+            fig = px.box(plot_df, x=x_col, y=y_col, color=color_col)
+
+        # ── Pie ────────────────────────────────────────────────────────────────
+        elif req.chart_type == "pie":
+            if not x_col:
+                return None
+            if y_col and pd.api.types.is_numeric_dtype(df[y_col]):
+                pie_df = df.groupby(x_col)[y_col].sum().reset_index()
+                pie_df = pie_df.nlargest(_MAX_PIE_SLICES, y_col)
+                fig = px.pie(pie_df, names=x_col, values=y_col)
+            else:
+                vc = df[x_col].value_counts().head(_MAX_PIE_SLICES).reset_index()
+                vc.columns = [x_col, "count"]
+                fig = px.pie(vc, names=x_col, values="count")
+
+        if fig is None:
+            return None
+
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=40, r=20, t=30, b=50),
+            showlegend=bool(color_col),
+        )
+
+        return _json.loads(fig.to_json())
+
+    except Exception:
+        return None
+
+
+@router.post("/{file_id}/custom-charts")
+def build_custom_charts(
+    file_id: str,
+    payload: CustomDashboardIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    file = (
+        db.query(FileModel)
+        .filter(FileModel.id == file_id, FileModel.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    df = _load_dataframe_from_blob(file)
+
+    # Apply simple equality filters
+    for col, val in (payload.filters or {}).items():
+        if val and col in df.columns:
+            df = df[df[col].astype(str) == str(val)]
+
+    charts_out: dict = {}
+    for req in payload.charts:
+        result = _build_chart(df, req)
+        if result is not None:
+            charts_out[req.id] = result
+
+    return {"charts": charts_out}
