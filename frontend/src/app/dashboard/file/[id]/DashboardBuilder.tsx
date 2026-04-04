@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Plot from "@/components/PlotNoTypes";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -34,12 +34,11 @@ type ChartConfig = {
 
 type ChartMeta = {
   label: string;
-  icon: string;
   hint: string;
   needsX: boolean;
   needsY: boolean;
   showAgg: boolean;
-  showColorBy: boolean;
+  showSplitBy: boolean;
   xLabel: string;
   yLabel: string;
 };
@@ -47,79 +46,73 @@ type ChartMeta = {
 const CHART_META: Record<ChartType, ChartMeta> = {
   bar: {
     label: "Bar Chart",
-    icon: "▊",
-    hint: "Compare values across categories — great for totals, averages, or counts by group.",
+    hint: "Compare totals or averages across categories — great for ranking regions, products, or teams.",
     needsX: true,
     needsY: false,
     showAgg: true,
-    showColorBy: true,
-    xLabel: "Category (X)",
-    yLabel: "Value (Y)",
+    showSplitBy: true,
+    xLabel: "Category",
+    yLabel: "Value to measure",
   },
   line: {
     label: "Line Chart",
-    icon: "📈",
-    hint: "Show how a value changes over time or a sequence — ideal for trends.",
+    hint: "Show how a number changes over time — ideal for tracking trends week over week or month over month.",
     needsX: true,
     needsY: true,
     showAgg: true,
-    showColorBy: true,
-    xLabel: "Time / Sequence (X)",
-    yLabel: "Numeric Value (Y)",
+    showSplitBy: true,
+    xLabel: "Date or sequence",
+    yLabel: "Value to track",
   },
   scatter: {
     label: "Scatter Plot",
-    icon: "⬤",
-    hint: "Explore the relationship between two numeric fields — spot correlations and outliers.",
+    hint: "Find correlations — do higher sales reps also have higher deal sizes? Plot two numbers to find out.",
     needsX: true,
     needsY: true,
     showAgg: false,
-    showColorBy: true,
-    xLabel: "Numeric Field (X)",
-    yLabel: "Numeric Field (Y)",
+    showSplitBy: true,
+    xLabel: "First number",
+    yLabel: "Second number",
   },
   histogram: {
-    label: "Histogram",
-    icon: "▤",
-    hint: "See how values are distributed across a numeric field — understand spread and shape.",
+    label: "Distribution",
+    hint: "See the spread of a number — are most values clustered together or spread wide? Great for spotting outliers.",
     needsX: true,
     needsY: false,
     showAgg: false,
-    showColorBy: false,
-    xLabel: "Numeric Field",
+    showSplitBy: false,
+    xLabel: "Number to analyse",
     yLabel: "",
   },
   box: {
-    label: "Box Plot",
-    icon: "▭",
-    hint: "Show the spread, median, and outliers for a numeric field, optionally grouped.",
+    label: "Range & Outliers",
+    hint: "Show the typical range and spot extreme values — useful for comparing performance spread across teams or periods.",
     needsX: false,
     needsY: true,
     showAgg: false,
-    showColorBy: false,
-    xLabel: "Group By (optional)",
-    yLabel: "Numeric Field",
+    showSplitBy: false,
+    xLabel: "Group by (optional)",
+    yLabel: "Number to measure",
   },
   pie: {
     label: "Pie Chart",
-    icon: "◔",
-    hint: "Show how a total breaks down into proportions across categories.",
+    hint: "Show how a total is divided — what share of revenue comes from each product or region?",
     needsX: true,
     needsY: false,
     showAgg: false,
-    showColorBy: false,
+    showSplitBy: false,
     xLabel: "Category (slices)",
     yLabel: "Value (optional)",
   },
 };
 
-const CHART_TYPES = (Object.keys(CHART_META) as ChartType[]);
+const CHART_TYPES = Object.keys(CHART_META) as ChartType[];
 
-const AGG_OPTIONS: { label: string; value: AggFunc }[] = [
-  { label: "Count records", value: "count" },
-  { label: "Sum",           value: "sum" },
-  { label: "Average",       value: "mean" },
-  { label: "Median",        value: "median" },
+const AGG_OPTIONS: { label: string; desc: string; value: AggFunc }[] = [
+  { label: "Count",   desc: "Number of records",    value: "count" },
+  { label: "Total",   desc: "Sum of all values",     value: "sum" },
+  { label: "Average", desc: "Mean of all values",    value: "mean" },
+  { label: "Median",  desc: "Middle value",          value: "median" },
 ];
 
 const makeId = () => Math.random().toString(36).slice(2, 10);
@@ -128,19 +121,23 @@ const makeId = () => Math.random().toString(36).slice(2, 10);
 
 function validate(cfg: ChartConfig, numCols: string[]): string | null {
   const meta = CHART_META[cfg.chart_type];
-  if (meta.needsX && !cfg.x) return `Select a field for "${meta.xLabel}"`;
-  if (meta.needsY && !cfg.y) return `Select a field for "${meta.yLabel}"`;
-  if (cfg.y && !numCols.includes(cfg.y))
-    return "The Y axis field must be numeric";
-  if (cfg.x && cfg.y && cfg.x === cfg.y)
-    return "X and Y must be different fields";
+  if (meta.needsX && !cfg.x) return `Choose a field for "${meta.xLabel}"`;
+  if (meta.needsY && !cfg.y) return `Choose a field for "${meta.yLabel}"`;
+  if (cfg.y && !numCols.includes(cfg.y)) return "The value field must be a number column";
+  if (cfg.x && cfg.y && cfg.x === cfg.y) return "The two fields must be different";
   return null;
 }
 
-// ── Helper: friendly column name ───────────────────────────────────────────────
+// ── Helper ─────────────────────────────────────────────────────────────────────
 
 function friendly(name: string) {
   return name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function typeLabel(t: ColType) {
+  if (t === "numeric") return "number";
+  if (t === "datetime") return "date";
+  return "text";
 }
 
 // ── ColSelect ─────────────────────────────────────────────────────────────────
@@ -150,9 +147,8 @@ function ColSelect({
   value,
   onChange,
   cols,
-  placeholder = "Select field",
+  placeholder = "Choose field",
   required = false,
-  disabled = false,
 }: {
   label: string;
   value: string;
@@ -160,24 +156,22 @@ function ColSelect({
   cols: ColMeta[];
   placeholder?: string;
   required?: boolean;
-  disabled?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1 min-w-0">
       <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+        {label}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
       </span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-main)] px-2 py-1.5 text-sm text-[var(--text-main)] disabled:opacity-40 focus:outline-none focus:border-cyan-400"
+        className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-main)] px-2 py-1.5 text-sm text-[var(--text-main)] focus:outline-none focus:border-cyan-400"
       >
         <option value="">{placeholder}</option>
         {cols.map((c) => (
           <option key={c.name} value={c.name}>
-            {friendly(c.name)}
-            {c.inferred_type === "numeric" ? " (#)" : c.inferred_type === "datetime" ? " (date)" : ""}
+            {friendly(c.name)} ({typeLabel(c.inferred_type)})
           </option>
         ))}
       </select>
@@ -194,7 +188,7 @@ function ChartCard({
   isRunning,
   onUpdate,
   onRemove,
-  onRender,
+  onGenerate,
   plotLayout,
 }: {
   cfg: ChartConfig;
@@ -203,7 +197,7 @@ function ChartCard({
   isRunning: boolean;
   onUpdate: (patch: Partial<ChartConfig>) => void;
   onRemove: () => void;
-  onRender: () => void;
+  onGenerate: () => void;
   plotLayout: object;
 }) {
   const meta = CHART_META[cfg.chart_type];
@@ -211,52 +205,52 @@ function ChartCard({
   const catCols = cols.filter((c) => c.inferred_type === "categorical");
   const allCols = cols;
 
-  // Column lists per role
-  const xCols = cfg.chart_type === "scatter" ? numCols
-    : cfg.chart_type === "histogram" ? numCols
-    : cfg.chart_type === "pie" ? catCols.length ? catCols : allCols
-    : allCols;
-  const yCols = numCols;
-  const colorCols = catCols;
+  const xCols =
+    cfg.chart_type === "scatter" || cfg.chart_type === "histogram"
+      ? numCols
+      : cfg.chart_type === "pie"
+      ? catCols.length ? catCols : allCols
+      : allCols;
 
   const validationError = validate(cfg, numCols.map((c) => c.name));
   const isReady = !validationError;
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] overflow-hidden">
-      {/* ── Card header ── */}
+
+      {/* ── Header ── */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
-        <span className="text-lg opacity-70">{meta.icon}</span>
         <input
           value={cfg.title}
           onChange={(e) => onUpdate({ title: e.target.value })}
-          className="flex-1 bg-transparent text-sm font-semibold text-[var(--text-main)] focus:outline-none placeholder:text-[var(--text-muted)]"
-          placeholder="Chart title…"
+          className="flex-1 bg-transparent text-sm font-semibold text-[var(--text-main)] focus:outline-none"
+          placeholder="e.g. Revenue by Region"
           maxLength={80}
         />
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={onRender}
+            onClick={onGenerate}
             disabled={!isReady || isRunning}
             className="rounded-md bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 transition-colors"
           >
-            {isRunning ? "Running…" : renderedFig ? "Re-render" : "Render"}
+            {isRunning ? "Building…" : renderedFig ? "Update Chart" : "Build Chart"}
           </button>
           <button
             type="button"
             onClick={onRemove}
             className="text-[var(--text-muted)] hover:text-red-400 text-xs px-2 py-1.5 rounded transition-colors"
-            title="Remove chart"
+            title="Remove this chart"
           >
             ✕
           </button>
         </div>
       </div>
 
-      {/* ── Config row ── */}
+      {/* ── Config ── */}
       <div className="px-4 py-3 bg-[color:var(--bg-main)] border-b border-[var(--border)]">
-        {/* Chart type selector */}
+
+        {/* Chart type pills */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           {CHART_TYPES.map((t) => (
             <button
@@ -267,19 +261,19 @@ function ChartCard({
                 "rounded-md px-2.5 py-1 text-xs font-medium transition-colors border",
                 cfg.chart_type === t
                   ? "bg-cyan-500/20 border-cyan-500/60 text-cyan-300"
-                  : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--text-muted)]",
+                  : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)]",
               ].join(" ")}
             >
-              {CHART_META[t].icon} {CHART_META[t].label}
+              {CHART_META[t].label}
             </button>
           ))}
         </div>
 
-        {/* Field config */}
+        {/* Field dropdowns */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {(meta.needsX || cfg.chart_type === "box") && (
             <ColSelect
-              label={meta.xLabel || "X Axis"}
+              label={meta.xLabel}
               value={cfg.x}
               onChange={(v) => onUpdate({ x: v })}
               cols={xCols}
@@ -289,11 +283,11 @@ function ChartCard({
 
           {(meta.needsY || meta.showAgg) && (
             <ColSelect
-              label={meta.yLabel || "Y Axis (numeric)"}
+              label={meta.yLabel || "Value to measure"}
               value={cfg.y}
               onChange={(v) => onUpdate({ y: v })}
-              cols={yCols}
-              placeholder="Select numeric field"
+              cols={numCols}
+              placeholder="Choose number field"
               required={meta.needsY}
             />
           )}
@@ -301,7 +295,7 @@ function ChartCard({
           {meta.showAgg && (
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
-                Aggregation
+                Summarise by
               </span>
               <select
                 value={cfg.agg}
@@ -309,40 +303,43 @@ function ChartCard({
                 className="w-full rounded-md border border-[var(--border)] bg-[color:var(--bg-main)] px-2 py-1.5 text-sm text-[var(--text-main)] focus:outline-none focus:border-cyan-400"
               >
                 {AGG_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value} title={o.desc}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
             </label>
           )}
 
-          {meta.showColorBy && (
+          {meta.showSplitBy && (
             <ColSelect
-              label="Group / Colour by"
+              label="Split by (optional)"
               value={cfg.color_by}
               onChange={(v) => onUpdate({ color_by: v })}
-              cols={colorCols}
-              placeholder="None"
+              cols={catCols}
+              placeholder="No split"
             />
           )}
         </div>
 
         {/* Hint */}
-        <p className="mt-2 text-[11px] text-[var(--text-muted)] leading-relaxed">
+        <p className="mt-2.5 text-[11px] text-[var(--text-muted)] leading-relaxed italic">
           {meta.hint}
         </p>
-      </div>
 
-      {/* ── Chart output area ── */}
-      <div className="px-4 py-4">
-        {validationError && !renderedFig && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+        {/* Validation */}
+        {validationError && (
+          <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300">
             {validationError}
           </div>
         )}
+      </div>
 
+      {/* ── Output ── */}
+      <div className="px-4 py-4">
         {isRunning && (
           <div className="flex items-center justify-center py-10 text-sm text-[var(--text-muted)]">
-            <span className="animate-pulse">Generating chart…</span>
+            <span className="animate-pulse">Building your chart…</span>
           </div>
         )}
 
@@ -350,30 +347,105 @@ function ChartCard({
           <div className="h-[340px] w-full">
             <Plot
               data={renderedFig.data}
-              layout={{
-                ...(renderedFig.layout ?? {}),
-                ...plotLayout,
-                title: undefined,
-              }}
-              config={{
-                responsive: true,
-                displaylogo: false,
-                modeBarButtonsToRemove: ["lasso2d", "select2d", "toImage"],
-              }}
+              layout={{ ...(renderedFig.layout ?? {}), ...plotLayout, title: undefined }}
+              config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d", "toImage"] }}
               style={{ width: "100%", height: "100%" }}
             />
           </div>
         )}
 
         {!isRunning && !renderedFig && isReady && (
-          <div className="flex flex-col items-center justify-center py-10 gap-2 text-[var(--text-muted)] border border-dashed border-[var(--border)] rounded-lg">
-            <span className="text-2xl opacity-30">{meta.icon}</span>
-            <p className="text-xs">Click <strong className="text-[var(--text-main)]">Render</strong> to generate this chart</p>
+          <div className="flex flex-col items-center justify-center py-8 gap-2 text-center border border-dashed border-[var(--border)] rounded-lg">
+            <p className="text-xs text-[var(--text-muted)]">
+              Your chart is configured — click{" "}
+              <strong className="text-[var(--text-main)]">Build Chart</strong> to generate it.
+            </p>
           </div>
         )}
       </div>
     </div>
   );
+}
+
+// ── Suggested charts (auto-generated from column types) ────────────────────────
+
+type Suggestion = {
+  label: string;
+  description: string;
+  config: Omit<ChartConfig, "id">;
+};
+
+function buildSuggestions(cols: ColMeta[]): Suggestion[] {
+  const numCols = cols.filter((c) => c.inferred_type === "numeric");
+  const catCols = cols.filter((c) => c.inferred_type === "categorical");
+  const dateCols = cols.filter((c) => c.inferred_type === "datetime");
+  const suggestions: Suggestion[] = [];
+
+  // Bar: first cat × first num
+  if (catCols.length && numCols.length) {
+    suggestions.push({
+      label: `${friendly(numCols[0].name)} by ${friendly(catCols[0].name)}`,
+      description: `Total ${friendly(numCols[0].name)} broken down by ${friendly(catCols[0].name)}`,
+      config: {
+        title: `${friendly(numCols[0].name)} by ${friendly(catCols[0].name)}`,
+        chart_type: "bar",
+        x: catCols[0].name,
+        y: numCols[0].name,
+        agg: "sum",
+        color_by: "",
+      },
+    });
+  }
+
+  // Line: date × first num
+  if (dateCols.length && numCols.length) {
+    suggestions.push({
+      label: `${friendly(numCols[0].name)} over time`,
+      description: `How ${friendly(numCols[0].name)} changes over time`,
+      config: {
+        title: `${friendly(numCols[0].name)} over time`,
+        chart_type: "line",
+        x: dateCols[0].name,
+        y: numCols[0].name,
+        agg: "sum",
+        color_by: "",
+      },
+    });
+  }
+
+  // Distribution of first num
+  if (numCols.length) {
+    suggestions.push({
+      label: `Spread of ${friendly(numCols[0].name)}`,
+      description: `See how ${friendly(numCols[0].name)} values are distributed`,
+      config: {
+        title: `Distribution of ${friendly(numCols[0].name)}`,
+        chart_type: "histogram",
+        x: numCols[0].name,
+        y: "",
+        agg: "count",
+        color_by: "",
+      },
+    });
+  }
+
+  // Pie: first cat
+  if (catCols.length) {
+    suggestions.push({
+      label: `Breakdown by ${friendly(catCols[0].name)}`,
+      description: `Share of records for each ${friendly(catCols[0].name)}`,
+      config: {
+        title: `Breakdown by ${friendly(catCols[0].name)}`,
+        chart_type: "pie",
+        x: catCols[0].name,
+        y: numCols[0]?.name ?? "",
+        agg: "count",
+        color_by: "",
+      },
+    });
+  }
+
+  return suggestions.slice(0, 3);
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -387,12 +459,10 @@ export default function DashboardBuilder({
 }) {
   const { theme } = useTheme();
 
-  // Column metadata from the file
   const [cols, setCols] = useState<ColMeta[]>([]);
   const [colsLoading, setColsLoading] = useState(true);
   const [colsError, setColsError] = useState<string | null>(null);
 
-  // Chart configs and rendered results
   const [charts, setCharts] = useState<ChartConfig[]>([]);
   const [rendered, setRendered] = useState<Record<string, any>>({});
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
@@ -400,26 +470,28 @@ export default function DashboardBuilder({
 
   const numCols = cols.filter((c) => c.inferred_type === "numeric");
   const catCols = cols.filter((c) => c.inferred_type === "categorical");
+  const dateCols = cols.filter((c) => c.inferred_type === "datetime");
 
-  // Consistent Plotly theming
-  const plotLayout = useMemo(() => ({
-    autosize: true,
-    paper_bgcolor: "rgba(0,0,0,0)",
-    plot_bgcolor: "rgba(0,0,0,0)",
-    font: {
-      color: theme === "dark" ? "#e2e8f0" : "#0f172a",
-      size: 12,
-    },
-    xaxis: {
-      gridcolor: theme === "dark" ? "rgba(226,232,240,0.1)" : "rgba(15,23,42,0.08)",
-      zerolinecolor: theme === "dark" ? "rgba(226,232,240,0.15)" : "rgba(15,23,42,0.12)",
-    },
-    yaxis: {
-      gridcolor: theme === "dark" ? "rgba(226,232,240,0.1)" : "rgba(15,23,42,0.08)",
-      zerolinecolor: theme === "dark" ? "rgba(226,232,240,0.15)" : "rgba(15,23,42,0.12)",
-    },
-    margin: { l: 50, r: 20, t: 20, b: 50 },
-  }), [theme]);
+  const suggestions = useMemo(() => buildSuggestions(cols), [cols]);
+
+  const plotLayout = useMemo(
+    () => ({
+      autosize: true,
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)",
+      font: { color: theme === "dark" ? "#e2e8f0" : "#0f172a", size: 12 },
+      xaxis: {
+        gridcolor: theme === "dark" ? "rgba(226,232,240,0.1)" : "rgba(15,23,42,0.08)",
+        zerolinecolor: theme === "dark" ? "rgba(226,232,240,0.15)" : "rgba(15,23,42,0.12)",
+      },
+      yaxis: {
+        gridcolor: theme === "dark" ? "rgba(226,232,240,0.1)" : "rgba(15,23,42,0.08)",
+        zerolinecolor: theme === "dark" ? "rgba(226,232,240,0.15)" : "rgba(15,23,42,0.12)",
+      },
+      margin: { l: 50, r: 20, t: 20, b: 50 },
+    }),
+    [theme]
+  );
 
   // ── Fetch column metadata ────────────────────────────────────────────────────
   useEffect(() => {
@@ -428,7 +500,7 @@ export default function DashboardBuilder({
     fetch(`${API_BASE_URL}/api/files/${fileId}/insights`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Failed to load file columns"))))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load file columns"))))
       .then((data) => {
         setCols(data.columns ?? []);
         setColsError(null);
@@ -438,26 +510,27 @@ export default function DashboardBuilder({
   }, [fileId, token]);
 
   // ── Chart management ─────────────────────────────────────────────────────────
-  const addChart = useCallback(() => {
-    const defaultX = catCols[0]?.name ?? cols[0]?.name ?? "";
-    const defaultY = numCols[0]?.name ?? "";
+  const addBlankChart = useCallback(() => {
     setCharts((prev) => [
       ...prev,
       {
         id: makeId(),
-        title: `Chart ${prev.length + 1}`,
+        title: "",
         chart_type: "bar",
-        x: defaultX,
-        y: defaultY,
+        x: catCols[0]?.name ?? cols[0]?.name ?? "",
+        y: numCols[0]?.name ?? "",
         agg: "count",
         color_by: "",
       },
     ]);
   }, [catCols, numCols, cols]);
 
+  const addFromSuggestion = useCallback((s: Suggestion) => {
+    setCharts((prev) => [...prev, { id: makeId(), ...s.config }]);
+  }, []);
+
   const updateChart = useCallback((id: string, patch: Partial<ChartConfig>) => {
     setCharts((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-    // Clear stale render when config changes
     setRendered((prev) => {
       const next = { ...prev };
       delete next[id];
@@ -474,8 +547,8 @@ export default function DashboardBuilder({
     });
   }, []);
 
-  // ── Render charts (one or all) ───────────────────────────────────────────────
-  const renderCharts = useCallback(
+  // ── Generate charts ──────────────────────────────────────────────────────────
+  const generateCharts = useCallback(
     async (ids: string[]) => {
       const toRun = charts.filter((c) => ids.includes(c.id));
       if (!toRun.length) return;
@@ -495,7 +568,7 @@ export default function DashboardBuilder({
 
         if (!res.ok) {
           const text = await res.text().catch(() => "");
-          throw new Error(text || "Failed to generate charts");
+          throw new Error(text || "Chart generation failed");
         }
 
         const data = await res.json();
@@ -503,15 +576,14 @@ export default function DashboardBuilder({
 
         setRendered((prev) => ({ ...prev, ...newFigs }));
 
-        // Flag charts that returned no result
         const missing = toRun.filter((c) => !newFigs[c.id]);
         if (missing.length) {
           setRunError(
-            `${missing.length} chart${missing.length > 1 ? "s" : ""} could not be rendered — check the field selections are compatible with the chart type.`
+            `${missing.length} chart${missing.length > 1 ? "s" : ""} couldn't be built — check that the selected fields are compatible with the chart type chosen.`
           );
         }
       } catch (err: any) {
-        setRunError(err.message ?? "Chart generation failed. Please try again.");
+        setRunError(err.message ?? "Something went wrong generating your charts. Please try again.");
       } finally {
         setRunningIds((prev) => {
           const next = new Set(prev);
@@ -523,23 +595,23 @@ export default function DashboardBuilder({
     [charts, fileId, token]
   );
 
-  const renderAll = useCallback(() => {
+  const generateAll = useCallback(() => {
     const validIds = charts
       .filter((c) => !validate(c, numCols.map((n) => n.name)))
       .map((c) => c.id);
-    renderCharts(validIds);
-  }, [charts, numCols, renderCharts]);
+    generateCharts(validIds);
+  }, [charts, numCols, generateCharts]);
 
   const anyRunning = runningIds.size > 0;
   const validChartCount = charts.filter(
     (c) => !validate(c, numCols.map((n) => n.name))
   ).length;
 
-  // ── Loading / error state ────────────────────────────────────────────────────
+  // ── Loading / error ──────────────────────────────────────────────────────────
   if (colsLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-sm text-[var(--text-muted)]">
-        <span className="animate-pulse">Loading file columns…</span>
+        <span className="animate-pulse">Loading your data fields…</span>
       </div>
     );
   }
@@ -547,7 +619,7 @@ export default function DashboardBuilder({
   if (colsError) {
     return (
       <div className="rounded-xl border border-red-500/40 bg-red-950/20 p-5 text-sm text-red-300">
-        Could not load column information: {colsError}
+        Could not load field information: {colsError}
       </div>
     );
   }
@@ -559,13 +631,9 @@ export default function DashboardBuilder({
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-main)]">Explore Your Data</h2>
-          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-            Build custom charts from{" "}
-            <span className="text-[var(--text-main)] font-medium">{cols.length} fields</span>
-            {numCols.length > 0 && (
-              <> — {numCols.length} numeric, {catCols.length} categorical</>
-            )}
+          <h2 className="text-lg font-semibold text-[var(--text-main)]">Build Your Charts</h2>
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+            Turn your data into charts — no formulas, no SQL, no waiting on your analyst.
           </p>
         </div>
 
@@ -573,16 +641,16 @@ export default function DashboardBuilder({
           {charts.length > 0 && (
             <button
               type="button"
-              onClick={renderAll}
+              onClick={generateAll}
               disabled={anyRunning || validChartCount === 0}
               className="rounded-md border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 disabled:opacity-40 text-cyan-300 text-sm font-medium px-4 py-2 transition-colors"
             >
-              {anyRunning ? "Running…" : `▶  Render All (${validChartCount})`}
+              {anyRunning ? "Building…" : `Generate All (${validChartCount})`}
             </button>
           )}
           <button
             type="button"
-            onClick={addChart}
+            onClick={addBlankChart}
             disabled={cols.length === 0}
             className="rounded-md bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-white text-sm font-semibold px-4 py-2 transition-colors"
           >
@@ -591,63 +659,90 @@ export default function DashboardBuilder({
         </div>
       </div>
 
-      {/* ── Run error banner ── */}
+      {/* ── Session notice ── */}
+      <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[color:var(--bg-panel)] px-3 py-2 text-xs text-[var(--text-muted)]">
+        <span>ℹ</span>
+        <span>Charts are for this session only — take a screenshot or download the chart image to save your work.</span>
+      </div>
+
+      {/* ── Error banner ── */}
       {runError && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-300 flex items-start justify-between gap-3">
           <span>{runError}</span>
-          <button
-            type="button"
-            onClick={() => setRunError(null)}
-            className="shrink-0 text-amber-400 hover:text-amber-200"
-          >
-            ✕
-          </button>
+          <button type="button" onClick={() => setRunError(null)} className="shrink-0 text-amber-400 hover:text-amber-200">✕</button>
         </div>
       )}
 
       {/* ── Empty state ── */}
       {charts.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] py-16 gap-4 text-center">
-          <div className="text-4xl opacity-20">📊</div>
-          <div>
-            <p className="text-sm font-medium text-[var(--text-main)]">No charts yet</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)] max-w-xs">
-              Add a chart and choose which fields to plot. You can add as many as you need and render them all at once.
+        <div className="rounded-xl border border-dashed border-[var(--border)] py-10 px-6 space-y-6">
+          <div className="text-center">
+            <p className="text-sm font-medium text-[var(--text-main)]">What do you want to explore?</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)] max-w-sm mx-auto">
+              Start with a suggested chart below, or click "+ Add Chart" to build your own.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={addChart}
-            className="rounded-md bg-cyan-500 hover:bg-cyan-400 text-white text-sm font-semibold px-5 py-2 transition-colors"
-          >
-            + Add your first chart
-          </button>
 
-          {/* Column summary chips */}
-          {cols.length > 0 && (
-            <div className="mt-2 flex flex-wrap justify-center gap-1.5 max-w-lg">
-              {cols.slice(0, 12).map((c) => (
-                <span
-                  key={c.name}
-                  className={[
-                    "rounded-full px-2.5 py-0.5 text-[10px] font-medium border",
-                    c.inferred_type === "numeric"
-                      ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
-                      : c.inferred_type === "datetime"
-                      ? "bg-purple-500/10 border-purple-500/30 text-purple-300"
-                      : "bg-slate-500/10 border-slate-500/30 text-[var(--text-muted)]",
-                  ].join(" ")}
-                >
-                  {friendly(c.name)}
-                </span>
-              ))}
-              {cols.length > 12 && (
-                <span className="text-[10px] text-[var(--text-muted)] self-center">
-                  +{cols.length - 12} more
-                </span>
-              )}
+          {/* Suggested charts */}
+          {suggestions.length > 0 && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-muted)] mb-2">
+                Suggested for your data
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => addFromSuggestion(s)}
+                    className="text-left rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] hover:border-cyan-500/50 hover:bg-cyan-500/5 p-4 transition-colors group"
+                  >
+                    <p className="text-sm font-semibold text-[var(--text-main)] group-hover:text-cyan-300 transition-colors">
+                      {s.label}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)] leading-relaxed">
+                      {s.description}
+                    </p>
+                    <p className="mt-2 text-[10px] text-cyan-500 font-medium">
+                      {CHART_META[s.config.chart_type].label} →
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={addBlankChart}
+              className="rounded-md border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--text-muted)] text-sm px-4 py-2 transition-colors"
+            >
+              + Start from scratch
+            </button>
+          </div>
+
+          {/* Field summary */}
+          <div className="flex flex-wrap justify-center gap-2 pt-2 border-t border-[var(--border)]">
+            {numCols.length > 0 && (
+              <span className="text-[11px] text-[var(--text-muted)]">
+                <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 mr-1" />
+                {numCols.length} number field{numCols.length > 1 ? "s" : ""}
+              </span>
+            )}
+            {catCols.length > 0 && (
+              <span className="text-[11px] text-[var(--text-muted)]">
+                <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1" />
+                {catCols.length} category field{catCols.length > 1 ? "s" : ""}
+              </span>
+            )}
+            {dateCols.length > 0 && (
+              <span className="text-[11px] text-[var(--text-muted)]">
+                <span className="inline-block w-2 h-2 rounded-full bg-purple-400 mr-1" />
+                {dateCols.length} date field{dateCols.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -662,31 +757,35 @@ export default function DashboardBuilder({
             isRunning={runningIds.has(cfg.id)}
             onUpdate={(patch) => updateChart(cfg.id, patch)}
             onRemove={() => removeChart(cfg.id)}
-            onRender={() => renderCharts([cfg.id])}
+            onGenerate={() => generateCharts([cfg.id])}
             plotLayout={plotLayout}
           />
         ))}
       </div>
 
-      {/* ── Help footer ── */}
+      {/* ── Field legend (shown when charts exist) ── */}
       {charts.length > 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] px-4 py-3">
           <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
-            Field types in this file
+            Fields in this file
           </p>
-          <div className="flex flex-wrap gap-3 text-[11px] text-[var(--text-muted)]">
-            <span>
-              <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 mr-1" />
-              Numeric ({numCols.length}) — use for Y axis, scatter plots, histograms
-            </span>
-            <span>
-              <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1" />
-              Categorical ({catCols.length}) — use for X axis, grouping, pie slices
-            </span>
-            {cols.filter((c) => c.inferred_type === "datetime").length > 0 && (
+          <div className="flex flex-wrap gap-4 text-[11px] text-[var(--text-muted)]">
+            {numCols.length > 0 && (
+              <span>
+                <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 mr-1" />
+                Number fields ({numCols.length}) — use for values, Y axis, distribution charts
+              </span>
+            )}
+            {catCols.length > 0 && (
+              <span>
+                <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1" />
+                Category fields ({catCols.length}) — use for grouping, X axis, pie slices
+              </span>
+            )}
+            {dateCols.length > 0 && (
               <span>
                 <span className="inline-block w-2 h-2 rounded-full bg-purple-400 mr-1" />
-                Date/Time ({cols.filter((c) => c.inferred_type === "datetime").length}) — use for X axis on line charts
+                Date fields ({dateCols.length}) — use on the X axis of line charts for trends
               </span>
             )}
           </div>

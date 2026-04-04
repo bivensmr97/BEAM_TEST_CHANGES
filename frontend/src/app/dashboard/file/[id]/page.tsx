@@ -169,7 +169,7 @@ export default function FileInsightsPage() {
   const tabs: { id: TabId; label: string; badge?: string }[] = [
     { id: "overview", label: "File Overview" },
     { id: "health",   label: "Data Health", badge: "Recommended" },
-    { id: "explore",  label: "Explore" },
+    { id: "explore",  label: "Charts" },
   ];
 
   return (
