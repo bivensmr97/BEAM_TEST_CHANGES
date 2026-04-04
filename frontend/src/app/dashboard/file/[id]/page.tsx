@@ -7,6 +7,7 @@ import { useTheme } from "@/context/ThemeContext";
 import Plot from "@/components/PlotNoTypes";
 import FilterPanel from "./FilterPanel";
 import AIWidget from "./AIWidget";
+import HealthDiagnosticView from "./HealthDiagnosticView";
 
 type InsightsResponse = {
   kpis: Record<string, any>;
@@ -15,10 +16,36 @@ type InsightsResponse = {
   ai_summary?: string | null;
 };
 
+type FileMeta = {
+  id: string;
+  original_name: string;
+  uploaded_at: string;
+  size_bytes: number | null;
+  status: string;
+};
+
 type FiltersState = Record<string, string | null>;
+type TabId = "overview" | "health";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+function formatChartName(key: string): string {
+  return key
+    .replace(/^timeseries_/, "Trend Over Time — ")
+    .replace(/^(distribution|breakdown)_\d+_/, (_, type) =>
+      type === "distribution" ? "Distribution — " : "Breakdown — "
+    )
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatFileSize(bytes: number | null): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function FileInsightsPage() {
   const params = useParams<{ id: string }>();
@@ -26,49 +53,54 @@ export default function FileInsightsPage() {
   const { tokens } = useAuth();
   const { theme } = useTheme();
 
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
+
+  // File metadata (name, size, upload date)
+  const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
+
+  // Insights tab state
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
-
-  // Applied filters (sent to backend)
   const [filtersState, setFiltersState] = useState<FiltersState>({});
-
-  // Pending filters (UI selections)
   const [pendingFilters, setPendingFilters] = useState<FiltersState>({});
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(true);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
 
   const hasToken = !!tokens?.accessToken;
 
+  // ---------------------------------------------------------------------------
+  // Fetch file metadata once on mount to get the file name
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!hasToken || !fileId) return;
+    fetch(`${API_BASE_URL}/api/files/${fileId}`, {
+      headers: { Authorization: `Bearer ${tokens!.accessToken}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setFileMeta(data as FileMeta); })
+      .catch(() => {/* silent — name not critical */});
+  }, [hasToken, fileId, tokens]);
+
   const plotTheme = useMemo(() => {
     if (typeof document === "undefined") {
-      return {
-        fontColor: "#e2e8f0",
-        gridColor: "rgba(226, 232, 240, 0.12)",
-      };
+      return { fontColor: "#e2e8f0", gridColor: "rgba(226, 232, 240, 0.12)" };
     }
-
     const styles = getComputedStyle(document.documentElement);
-    const textMain =
-      styles.getPropertyValue("--text-main").trim() || "#e2e8f0";
-    const gridColor =
-      theme === "dark"
-        ? "rgba(226, 232, 240, 0.12)"
-        : "rgba(15, 23, 42, 0.12)";
-
-    return { fontColor: textMain, gridColor };
+    const textMain = styles.getPropertyValue("--text-main").trim() || "#e2e8f0";
+    return {
+      fontColor: textMain,
+      gridColor: theme === "dark" ? "rgba(226, 232, 240, 0.12)" : "rgba(15, 23, 42, 0.12)",
+    };
   }, [theme]);
 
-  // -----------------------------------------------------
-  // Fetch Insights with explicit filters (used for presets)
-  // -----------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Insights fetch
+  // ---------------------------------------------------------------------------
   const fetchInsightsWithFilters = useCallback(
     async (nextFilters: FiltersState) => {
       if (!hasToken || !fileId) return;
-
       try {
-        setLoading(true);
-        setError(null);
-
+        setLoadingInsights(true);
+        setInsightsError(null);
         const res = await fetch(`${API_BASE_URL}/api/files/${fileId}/insights`, {
           method: "POST",
           headers: {
@@ -77,139 +109,74 @@ export default function FileInsightsPage() {
           },
           body: JSON.stringify({ filters: nextFilters }),
         });
-
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(
-            `Failed to load insights (${res.status}): ${text || res.statusText}`
-          );
+          throw new Error(text || "Failed to load file overview");
         }
-
-        const data = (await res.json()) as InsightsResponse;
-        setInsights(data);
+        setInsights((await res.json()) as InsightsResponse);
       } catch (err: any) {
-        console.error("Insights error:", err);
-        setError(err.message || "Failed to load insights");
+        setInsightsError(err.message || "Failed to load file overview");
       } finally {
-        setLoading(false);
+        setLoadingInsights(false);
       }
     },
     [hasToken, fileId, tokens]
   );
 
-  // -----------------------------------------------------
-  // Fetch Insights using current applied filters
-  // -----------------------------------------------------
-  const fetchInsights = useCallback(async () => {
-    await fetchInsightsWithFilters(filtersState);
-  }, [fetchInsightsWithFilters, filtersState]);
+  const fetchInsights = useCallback(() => fetchInsightsWithFilters(filtersState), [fetchInsightsWithFilters, filtersState]);
 
-  // Initial fetch + whenever applied filters change
+  useEffect(() => { fetchInsights(); }, [fetchInsights]);
+
   useEffect(() => {
-    fetchInsights();
-  }, [fetchInsights]);
-
-  // -----------------------------------------------------
-  // Debounce pending filters -> applied filters
-  // (prevents spamming backend on every dropdown change)
-  // -----------------------------------------------------
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setFiltersState(pendingFilters);
-    }, 500);
-
+    const t = setTimeout(() => setFiltersState(pendingFilters), 500);
     return () => clearTimeout(t);
   }, [pendingFilters]);
 
-  // -----------------------------------------------------
-  // Render Checks
-  // -----------------------------------------------------
   if (!hasToken) {
     return (
       <div className="px-6 py-6 text-sm text-red-400">
-        You must be authenticated to view file insights.
+        You must be signed in to view this page.
       </div>
     );
   }
 
-  if (loading && !insights) {
-    return (
-      <div className="px-6 py-6 text-sm text-[var(--text-muted)]">
-        Loading insights…
-      </div>
-    );
-  }
+  const { kpis, charts, filters } = insights ?? { kpis: null, charts: null, filters: {} };
+  const anyFilters = Object.keys(filters ?? {}).length > 0;
 
-  if (error && !insights) {
-    return (
-      <div className="px-6 py-6 text-sm text-red-400">
-        {error}
-      </div>
-    );
-  }
-
-  if (!insights) {
-    return (
-      <div className="px-6 py-6 text-sm text-[var(--text-muted)]">No insights available.</div>
-    );
-  }
-
-  const { kpis, charts, filters } = insights;
-  const anyFilters = Object.keys(filters || {}).length > 0;
-
-  const handleFilterChange = (key: string, value: string | null) => {
-    setPendingFilters((prev) => ({
-      ...prev,
-      [key]: value === "" ? null : value,
-    }));
-  };
+  const handleFilterChange = (key: string, value: string | null) =>
+    setPendingFilters((prev) => ({ ...prev, [key]: value === "" ? null : value }));
 
   const clearAll = () => {
     setPendingFilters({});
     setFiltersState({});
-    // Optional immediate refresh on clear:
     fetchInsightsWithFilters({});
   };
 
-  // -----------------------------------------------------
-  // Presets (stub logic now, real logic later)
-  // -----------------------------------------------------
-  const applyPreset = (preset: string) => {
-    // NOTE: For now we don't know the dataset schema, so presets are placeholders.
-    // Later we can:
-    // - map presets to real filter selections
-    // - or send preset name to backend (recommended long-term)
+  // ---------------------------------------------------------------------------
+  // Build a friendly file title for the header
+  // ---------------------------------------------------------------------------
+  const fileTitle = fileMeta?.original_name ?? "File Analysis";
+  const fileSubtitle = fileMeta
+    ? [
+        `Uploaded ${new Date(fileMeta.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+        formatFileSize(fileMeta.size_bytes),
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
 
-    const nextFilters: FiltersState = { ...pendingFilters };
+  const tabs: { id: TabId; label: string; badge?: string }[] = [
+    { id: "overview", label: "File Overview" },
+    { id: "health",   label: "Data Health", badge: "Recommended" },
+  ];
 
-    // Placeholder behavior: just log and force refresh using current filters
-    // You can replace these with real mappings once you define them.
-    if (preset === "missing_data") {
-      // Example: no-op until we implement backend preset logic
-    } else if (preset === "outliers") {
-      // no-op
-    } else if (preset === "high_value") {
-      // no-op
-    }
-
-    // Keep UI consistent
-    setPendingFilters(nextFilters);
-
-    // IMMEDIATE APPLY: bypass debounce
-    setFiltersState(nextFilters);
-    fetchInsightsWithFilters(nextFilters);
-  };
-
-  // -----------------------------------------------------
-  // MAIN UI
-  // -----------------------------------------------------
   return (
     <div className="flex w-full min-h-screen">
-      {/* LEFT FILTER PANEL */}
-      {anyFilters && (
+      {/* Filter sidebar — overview tab only */}
+      {activeTab === "overview" && anyFilters && (
         <aside className="hidden lg:flex flex-col w-64 border-r border-[var(--border)] bg-[color:var(--bg-panel)] p-4 overflow-y-auto">
           <FilterPanel
-            filters={filters}
+            filters={filters ?? {}}
             selected={pendingFilters}
             onChange={handleFilterChange}
             onClear={clearAll}
@@ -217,116 +184,156 @@ export default function FileInsightsPage() {
               setFiltersState(pendingFilters);
               fetchInsightsWithFilters(pendingFilters);
             }}
-            onApplyPreset={(preset) => {
-              console.log("Preset Clicked:", preset);
-              applyPreset(preset);
-            }}
           />
         </aside>
       )}
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 overflow-y-auto px-6 py-6 space-y-10">
-        {/* Header */}
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-[var(--text-main)]">File Insights</h1>
-            <p className="mt-1 text-xs font-mono text-[var(--text-muted)]">
-              File ID: <span className="text-cyan-300">{fileId}</span>
-            </p>
+      <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        {/* Page header — shows real file name */}
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-[var(--text-main)] truncate">
+              {fileTitle}
+            </h1>
+            {fileSubtitle && (
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{fileSubtitle}</p>
+            )}
           </div>
 
-          <button
-            onClick={fetchInsights}
-            disabled={loading}
-            className="rounded-md border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-main)] hover:bg-[color:var(--bg-panel-2)] disabled:opacity-60"
-            type="button"
-          >
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
+          {activeTab === "overview" && (
+            <button
+              onClick={fetchInsights}
+              disabled={loadingInsights}
+              className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-main)] hover:bg-[color:var(--bg-panel-2)] disabled:opacity-60"
+              type="button"
+            >
+              {loadingInsights ? "Refreshing…" : "Refresh"}
+            </button>
+          )}
         </header>
 
-        {/* KPI Cards */}
-        {kpis && (
-          <section>
-            <h2 className="mb-3 text-sm font-semibold text-[var(--text-main)]">Key Metrics</h2>
+        {/* Tab bar */}
+        <div className="flex gap-1 border-b border-[var(--border)]">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              type="button"
+              className={[
+                "relative px-4 py-2 text-sm font-medium rounded-t-md transition-colors",
+                activeTab === tab.id
+                  ? "bg-[color:var(--bg-panel)] text-[var(--text-main)] border border-b-0 border-[var(--border)] -mb-px"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-main)]",
+              ].join(" ")}
+            >
+              {tab.label}
+              {tab.badge && activeTab !== tab.id && (
+                <span className="ml-2 inline-block rounded-full bg-cyan-500/20 border border-cyan-500/40 px-1.5 py-0 text-[10px] font-semibold text-cyan-300 leading-4">
+                  ✓
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Object.entries(kpis).map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] p-4"
-                >
-                  <p className="text-xs font-medium text-[var(--text-muted)]">{label}</p>
-                  <p className="mt-2 text-2xl font-semibold text-cyan-300">{value}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Error Banner */}
-        {error && (
-          <div className="rounded-md border border-red-700 bg-red-900/20 px-4 py-2 text-xs text-red-300">
-            {error}
-          </div>
-        )}
-
-        {/* Charts */}
-        {charts && Object.keys(charts).length > 0 && (
-          <section className="space-y-6">
-            {Object.entries(charts).map(([name, fig]) => (
-              <div
-                key={name}
-                className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] p-5"
-              >
-                <h2 className="mb-3 text-sm font-semibold text-[var(--text-main)]">
-                  {name.replace(/_/g, " ")}
-                </h2>
-
-                <div className="h-[320px] w-full">
-                  <Plot
-                    data={fig.data}
-                    layout={{
-                      ...(fig.layout || {}),
-                      autosize: true,
-                      paper_bgcolor: "rgba(0,0,0,0)",
-                      plot_bgcolor: "rgba(0,0,0,0)",
-                      font: {
-                        ...(fig.layout?.font || {}),
-                        color: plotTheme.fontColor,
-                      },
-                      xaxis: {
-                        ...(fig.layout?.xaxis || {}),
-                        gridcolor: plotTheme.gridColor,
-                        zerolinecolor: plotTheme.gridColor,
-                      },
-                      yaxis: {
-                        ...(fig.layout?.yaxis || {}),
-                        gridcolor: plotTheme.gridColor,
-                        zerolinecolor: plotTheme.gridColor,
-                      },
-                    }}
-                    config={{
-                      responsive: true,
-                      displaylogo: false,
-                      modeBarButtonsToRemove: ["toImage", "lasso2d", "select2d"],
-                    }}
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                </div>
+        {/* ── File Overview ── */}
+        {activeTab === "overview" && (
+          <>
+            {loadingInsights && !insights && (
+              <div className="py-12 text-center text-sm text-[var(--text-muted)]">
+                Loading your file…
               </div>
-            ))}
-          </section>
+            )}
+
+            {insightsError && (
+              <div className="rounded-md border border-red-700 bg-red-900/20 px-4 py-2 text-sm text-red-300">
+                {insightsError}
+              </div>
+            )}
+
+            {kpis && Object.keys(kpis).length > 0 && (
+              <section>
+                <h2 className="mb-3 text-sm font-semibold text-[var(--text-main)]">Key Metrics</h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {Object.entries(kpis).map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] p-4"
+                    >
+                      <p className="text-xs font-medium text-[var(--text-muted)]">{label}</p>
+                      <p className="mt-2 text-2xl font-semibold text-cyan-300">
+                        {typeof value === "number" ? value.toLocaleString() : value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {charts && Object.keys(charts).length > 0 && (
+              <section className="space-y-6">
+                <h2 className="text-sm font-semibold text-[var(--text-main)]">Charts</h2>
+                {Object.entries(charts).map(([key, fig]) => (
+                  <div
+                    key={key}
+                    className="rounded-xl border border-[var(--border)] bg-[color:var(--bg-panel)] p-5"
+                  >
+                    <h3 className="mb-3 text-sm font-semibold text-[var(--text-main)]">
+                      {formatChartName(key)}
+                    </h3>
+                    <div className="h-[340px] w-full">
+                      <Plot
+                        data={fig.data}
+                        layout={{
+                          ...(fig.layout || {}),
+                          autosize: true,
+                          paper_bgcolor: "rgba(0,0,0,0)",
+                          plot_bgcolor: "rgba(0,0,0,0)",
+                          font: { ...(fig.layout?.font || {}), color: plotTheme.fontColor },
+                          xaxis: {
+                            ...(fig.layout?.xaxis || {}),
+                            gridcolor: plotTheme.gridColor,
+                            zerolinecolor: plotTheme.gridColor,
+                          },
+                          yaxis: {
+                            ...(fig.layout?.yaxis || {}),
+                            gridcolor: plotTheme.gridColor,
+                            zerolinecolor: plotTheme.gridColor,
+                          },
+                        }}
+                        config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ["toImage", "lasso2d", "select2d"] }}
+                        style={{ width: "100%", height: "100%" }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {!loadingInsights && !insightsError && !insights && (
+              <div className="py-12 text-center text-sm text-[var(--text-muted)]">No data available.</div>
+            )}
+          </>
         )}
 
-        {/* AI Insights Panel */}
+        {/* ── Data Health ── */}
+        {activeTab === "health" && (
+          <HealthDiagnosticView
+            fileId={fileId}
+            fileName={fileTitle}
+            token={tokens!.accessToken ?? ""}
+          />
+        )}
+      </main>
+
+      {/* AI summary button — overview tab only */}
+      {activeTab === "overview" && (
         <AIWidget
           fileId={fileId}
-          initialSummary={(insights as any).ai_summary ?? null}
+          initialSummary={(insights as any)?.ai_summary ?? null}
           token={tokens!.accessToken ?? ""}
         />
-      </main>
+      )}
     </div>
   );
 }
