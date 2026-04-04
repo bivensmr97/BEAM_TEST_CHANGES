@@ -7,8 +7,7 @@ type FiltersProps = {
   selected: Record<string, string | null>;
   onChange: (key: string, value: string | null) => void;
   onClear: () => void;
-  onApply?: () => void;                 // ✅ NEW
-  onApplyPreset?: (preset: string) => void;
+  onApply?: () => void;
 };
 
 export default function FilterPanel({
@@ -17,7 +16,6 @@ export default function FilterPanel({
   onChange,
   onClear,
   onApply,
-  onApplyPreset,
 }: FiltersProps) {
   const filterKeys = Object.keys(filters || {});
 
@@ -78,42 +76,6 @@ export default function FilterPanel({
         </div>
       ))}
 
-      {/* Presets */}
-      <div className="border-t border-[var(--border)] pt-4">
-        <h2 className="text-[var(--text-main)] text-base font-semibold mb-2">
-          Preset Filters
-        </h2>
-
-        <p className="text-xs text-[var(--text-muted)] mb-3">
-          (Your team can configure global or saved filters here.)
-        </p>
-
-        <div className="space-y-2">
-          <button
-            className="w-full bg-[color:var(--bg-panel-2)] rounded px-3 py-2 text-xs hover:bg-[color:var(--bg-panel-2)]"
-            type="button"
-            onClick={() => onApplyPreset?.("high_value")}
-          >
-            High-Value Records
-          </button>
-
-          <button
-            className="w-full bg-[color:var(--bg-panel-2)] rounded px-3 py-2 text-xs hover:bg-[color:var(--bg-panel-2)]"
-            type="button"
-            onClick={() => onApplyPreset?.("missing_data")}
-          >
-            Missing Data Check
-          </button>
-
-          <button
-            className="w-full bg-[color:var(--bg-panel-2)] rounded px-3 py-2 text-xs hover:bg-[color:var(--bg-panel-2)]"
-            type="button"
-            onClick={() => onApplyPreset?.("outliers")}
-          >
-            Outliers
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

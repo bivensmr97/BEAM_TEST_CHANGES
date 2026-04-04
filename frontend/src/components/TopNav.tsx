@@ -36,7 +36,7 @@ export default function TopNav() {
             BEAM Analytics
           </div>
           <div className="text-xs" style={{ opacity: 0.8 }}>
-            Multi-tenant ingest &amp; insights
+            Data Quality Platform
           </div>
         </div>
 
@@ -59,9 +59,6 @@ export default function TopNav() {
           <>
             <div className="text-right">
               <div className="font-medium">{user.email}</div>
-              <div className="text-xs" style={{ color: "var(--accent)" }}>
-                {user.role}
-              </div>
             </div>
 
             {/* Settings button */}

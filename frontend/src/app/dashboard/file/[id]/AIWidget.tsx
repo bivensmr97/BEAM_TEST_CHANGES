@@ -16,13 +16,15 @@ export default function AIWidget({
 
   return (
     <>
-      {/* Floating AI Button */}
+      {/* Floating AI Summary Button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-full w-16 h-16 shadow-xl transition-transform"
+        className="fixed bottom-6 right-6 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-full shadow-xl transition-transform px-4 py-3 text-sm"
         type="button"
+        title="Get an AI-generated summary of your file's contents and quality"
+        aria-label="AI Summary — get an AI-generated summary of this file"
       >
-        AI
+        AI Summary
       </button>
 
       {/* Slide-up Panel */}
