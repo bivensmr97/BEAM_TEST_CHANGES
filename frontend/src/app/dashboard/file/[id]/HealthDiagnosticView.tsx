@@ -308,6 +308,10 @@ export default function HealthDiagnosticView({
       setLoading(true);
       setError(null);
       try {
+        const controller = new AbortController();
+        // 90-second timeout — surface an error instead of hanging forever
+        const timeout = setTimeout(() => controller.abort(), 90_000);
+
         const res = await fetch(`${API_BASE_URL}/api/files/${fileId}/health`, {
           method: "POST",
           headers: {
@@ -315,11 +319,13 @@ export default function HealthDiagnosticView({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({}),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeout);
 
         if (!res.ok) {
           const text = await res.text().catch(() => "");
-          // Strip HTTP status codes from user-facing messages
           const clean = text.replace(/^\s*\d{3}[:\s]+/, "").replace(/^"(.*)"$/, "$1") || "We couldn't analyze this file right now. Please try again.";
           throw new Error(clean);
         }
@@ -330,26 +336,44 @@ export default function HealthDiagnosticView({
           setHealth(data);
         }
       } catch (err: any) {
-        if (!cancelled) setError(err.message || "We couldn't analyze this file right now.");
+        if (!cancelled) {
+          const msg =
+            err.name === "AbortError"
+              ? "The analysis is taking longer than expected. Please try again — it may work on a second attempt."
+              : err.message || "We couldn't analyze this file right now.";
+          setError(msg);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     fetchHealth();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      // If the fetch was cancelled before completing (e.g. due to a token refresh),
+      // reset the flag so the next render retries with the updated token.
+      if (!healthCache[fileId]) {
+        hasFetched.current = false;
+      }
+    };
   }, [fileId, token]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-sm text-[var(--text-muted)]">
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-4">
           <div className="text-3xl animate-pulse">🔍</div>
           <p className="font-medium text-[var(--text-main)]">Analyzing your data…</p>
-          <p className="text-xs max-w-xs">
-            We're checking for missing values, duplicates, formatting issues, and unusual values.
-            This may take a few seconds for larger files.
+          <p className="text-xs max-w-xs leading-relaxed">
+            Checking for missing values, duplicates, formatting issues, and unusual values.
+            This can take 15–30 seconds depending on file size.
           </p>
+          <div className="w-48 h-1 bg-[color:var(--bg-main)] rounded-full overflow-hidden mx-auto">
+            <div className="h-full bg-cyan-500 rounded-full animate-[loading_2s_ease-in-out_infinite]"
+                 style={{ width: "60%", animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite" }} />
+          </div>
         </div>
       </div>
     );

@@ -8,6 +8,7 @@ import Plot from "@/components/PlotNoTypes";
 import FilterPanel from "./FilterPanel";
 import AIWidget from "./AIWidget";
 import HealthDiagnosticView from "./HealthDiagnosticView";
+import DashboardBuilder from "./DashboardBuilder";
 
 type InsightsResponse = {
   kpis: Record<string, any>;
@@ -25,7 +26,7 @@ type FileMeta = {
 };
 
 type FiltersState = Record<string, string | null>;
-type TabId = "overview" | "health";
+type TabId = "overview" | "health" | "explore";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -168,6 +169,7 @@ export default function FileInsightsPage() {
   const tabs: { id: TabId; label: string; badge?: string }[] = [
     { id: "overview", label: "File Overview" },
     { id: "health",   label: "Data Health", badge: "Recommended" },
+    { id: "explore",  label: "Charts" },
   ];
 
   return (
@@ -321,6 +323,14 @@ export default function FileInsightsPage() {
           <HealthDiagnosticView
             fileId={fileId}
             fileName={fileTitle}
+            token={tokens!.accessToken ?? ""}
+          />
+        )}
+
+        {/* ── Explore ── */}
+        {activeTab === "explore" && (
+          <DashboardBuilder
+            fileId={fileId}
             token={tokens!.accessToken ?? ""}
           />
         )}
