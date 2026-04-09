@@ -19,9 +19,10 @@ export default function Sidebar({
       {/* Toggle Button */}
       <button
         onClick={() => setOpen(!open)}
-        className="text-[var(--text-muted)] hover:text-[var(--text-main)] p-2 border-b border-[var(--border)]"
+        className="flex h-10 w-full items-center justify-center border-b border-[var(--border)] text-sm font-semibold tracking-wide text-[var(--text-muted)] hover:text-[var(--text-main)]"
+        type="button"
       >
-        {open ? "<<<" : ">>>"}
+        {open ? "<<" : ">>"}
       </button>
 
       {/* Sidebar Content (hidden when collapsed) */}

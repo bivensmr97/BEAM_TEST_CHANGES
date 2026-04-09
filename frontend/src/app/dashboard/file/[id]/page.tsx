@@ -10,6 +10,8 @@ import AIWidget from "./AIWidget";
 import HealthDiagnosticView from "./HealthDiagnosticView";
 import DashboardBuilder from "./DashboardBuilder";
 
+const SHOW_OVERVIEW_FILTERS = false;
+
 type InsightsResponse = {
   kpis: Record<string, unknown>;
   charts: Record<string, { data: unknown[]; layout?: Record<string, unknown> }>;
@@ -168,6 +170,7 @@ export default function FileInsightsPage() {
     filters: {},
   };
   const anyFilters = Object.keys(filters ?? {}).length > 0;
+  const showOverviewFilters = SHOW_OVERVIEW_FILTERS && anyFilters;
   const workbook = fileMeta?.workbook ?? null;
   const hasWorkbookSheets = !!workbook && workbook.sheet_count > 0;
 
@@ -203,7 +206,7 @@ export default function FileInsightsPage() {
 
   return (
     <div className="flex w-full min-h-screen">
-      {activeTab === "overview" && anyFilters && (
+      {activeTab === "overview" && showOverviewFilters && (
         <aside className="hidden lg:flex flex-col w-64 border-r border-[var(--border)] bg-[color:var(--bg-panel)] p-4 overflow-y-auto">
           <FilterPanel
             filters={filters ?? {}}

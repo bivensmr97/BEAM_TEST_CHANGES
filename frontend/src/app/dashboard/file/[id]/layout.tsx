@@ -22,11 +22,11 @@ export default function InsightsLayout({
       >
         <button
           onClick={() => setShowRightPanel(!showRightPanel)}
-          className="w-full py-2 text-xs"
+          className="flex h-10 w-full items-center justify-center text-sm font-semibold tracking-wide text-[var(--text-muted)] hover:text-[var(--text-main)]"
           style={{ background: "var(--bg-panel-2)", borderBottom: "1px solid var(--border)" }}
           type="button"
         >
-          {showRightPanel ? ">>>" : "<<<"}
+          {showRightPanel ? ">>" : "<<"}
         </button>
 
         {showRightPanel && <div className="p-4">{rightPanel}</div>}
