@@ -1,8 +1,8 @@
 # backend/app/routers/files.py
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from uuid import uuid4, UUID
 from datetime import datetime
 import re
@@ -45,6 +45,7 @@ class FileOut(BaseModel):
     uploaded_at: datetime
     status: str
     size_bytes: int | None
+    workbook: Optional[Dict[str, Any]] = None
 
     class Config:
         orm_mode = True
@@ -114,6 +115,7 @@ class HealthOut(BaseModel):
 
 class HealthIn(BaseModel):
     yaml_config: Optional[str] = None
+    sheet_name: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +130,44 @@ def _content_disposition_attachment(filename: str) -> str:
     return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
 
 
-def _load_dataframe_from_blob(file: FileModel) -> pd.DataFrame:
+def _extract_workbook_metadata(filename: str, data: bytes) -> Optional[Dict[str, Any]]:
+    name_lc = (filename or "").lower()
+    if not (name_lc.endswith(".xlsx") or name_lc.endswith(".xls")):
+        return None
+
+    try:
+        workbook = pd.ExcelFile(io.BytesIO(data))
+        sheet_names = [str(name) for name in workbook.sheet_names]
+        if not sheet_names:
+            return None
+        return {
+            "sheet_names": sheet_names,
+            "sheet_count": len(sheet_names),
+            "default_sheet": sheet_names[0],
+        }
+    except Exception:
+        return None
+
+
+def _file_out_with_workbook(file: FileModel) -> FileOut:
+    workbook = None
+    try:
+        data = container_client.get_blob_client(file.blob_path).download_blob().readall()
+        workbook = _extract_workbook_metadata(file.original_name, data)
+    except Exception:
+        workbook = None
+
+    return FileOut(
+        id=file.id,
+        original_name=file.original_name,
+        uploaded_at=file.uploaded_at,
+        status=file.status,
+        size_bytes=file.size_bytes,
+        workbook=workbook,
+    )
+
+
+def _load_dataframe_from_blob(file: FileModel, sheet_name: Optional[str] = None) -> pd.DataFrame:
     """Download a file from Azure Blob and parse into a DataFrame.
 
     - Applies a 500k row cap to prevent OOM on huge files
@@ -145,7 +184,22 @@ def _load_dataframe_from_blob(file: FileModel) -> pd.DataFrame:
         except UnicodeDecodeError:
             df = pd.read_csv(io.BytesIO(data), encoding="latin-1", nrows=MAX_ROWS_LOAD)
     elif name_lc.endswith(".xlsx") or name_lc.endswith(".xls"):
-        df = pd.read_excel(io.BytesIO(data))
+        try:
+            workbook = pd.ExcelFile(io.BytesIO(data))
+            available = [str(name) for name in workbook.sheet_names]
+            selected_sheet = sheet_name or (available[0] if available else None)
+            if not selected_sheet:
+                raise HTTPException(status_code=422, detail="This workbook does not contain any sheets.")
+            if selected_sheet not in available:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Worksheet '{selected_sheet}' was not found in this workbook.",
+                )
+            df = pd.read_excel(workbook, sheet_name=selected_sheet)
+        except HTTPException:
+            raise
+        except Exception as ex:
+            raise HTTPException(status_code=400, detail=f"Could not read Excel workbook: {ex}")
         if len(df) > MAX_ROWS_LOAD:
             df = df.head(MAX_ROWS_LOAD)
     else:
@@ -269,7 +323,7 @@ def get_file(file_id: str, db: Session = Depends(get_db), user: User = Depends(g
     )
     if not file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    return file
+    return _file_out_with_workbook(file)
 
 
 @router.get("/{file_id}/download")
@@ -308,7 +362,12 @@ def download_file(file_id: str, db: Session = Depends(get_db), user: User = Depe
 # ---------------------------------------------------------------------------
 
 @router.get("/{file_id}/insights", response_model=InsightsOut)
-def file_insights(file_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def file_insights(
+    file_id: str,
+    sheet_name: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     file = (
         db.query(FileModel)
         .filter(FileModel.id == file_id, FileModel.tenant_id == user.tenant_id)
@@ -317,7 +376,7 @@ def file_insights(file_id: str, db: Session = Depends(get_db), user: User = Depe
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
-    df = _load_dataframe_from_blob(file)
+    df = _load_dataframe_from_blob(file, sheet_name=sheet_name)
     cols = []
     for c in df.columns:
         s = df[c]
@@ -362,7 +421,7 @@ def file_health(
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
-    df = _load_dataframe_from_blob(file)
+    df = _load_dataframe_from_blob(file, sheet_name=payload.sheet_name)
     n_rows = len(df)
     n_cols = len(df.columns)
 
@@ -733,6 +792,7 @@ class ChartRequest(BaseModel):
 class CustomDashboardIn(BaseModel):
     charts: List[ChartRequest] = []
     filters: Optional[Dict[str, Optional[str]]] = {}
+    sheet_name: Optional[str] = None
 
 
 _MAX_SCATTER_PTS = 8_000
@@ -865,7 +925,7 @@ def build_custom_charts(
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
-    df = _load_dataframe_from_blob(file)
+    df = _load_dataframe_from_blob(file, sheet_name=payload.sheet_name)
 
     # Apply simple equality filters
     for col, val in (payload.filters or {}).items():

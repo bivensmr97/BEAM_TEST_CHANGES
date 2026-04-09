@@ -24,12 +24,14 @@ async def get_file_insights(
         raise HTTPException(404, "File not found")
 
     filters = payload.get("filters", {})
+    sheet_name = payload.get("sheet_name")
 
-    return generate_insights(file.blob_path, filters)
+    return generate_insights(file.blob_path, filters, sheet_name=sheet_name)
 
 @router.post("/{file_id}/ai-summary")
 def regenerate_ai_summary(
     file_id: str,
+    payload: dict | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -41,6 +43,7 @@ def regenerate_ai_summary(
     if not file:
         raise HTTPException(404, "File not found")
 
-    df = load_file_from_blob(file.blob_path)
+    sheet_name = (payload or {}).get("sheet_name")
+    df = load_file_from_blob(file.blob_path, sheet_name=sheet_name)
     summary = generate_ai_summary(df)
     return {"summary": summary}

@@ -7,10 +7,12 @@ export default function AIWidget({
   fileId,
   initialSummary,
   token,
+  sheetName,
 }: {
   fileId: string;
   initialSummary: string | null;
   token: string;
+  sheetName?: string | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -52,7 +54,12 @@ export default function AIWidget({
 
         {/* Content */}
         <div className="p-4">
-          <AIInsights fileId={fileId} initialSummary={initialSummary} token={token} />
+          <AIInsights
+            fileId={fileId}
+            initialSummary={initialSummary}
+            token={token}
+            sheetName={sheetName}
+          />
         </div>
       </div>
     </>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -11,10 +11,16 @@ import HealthDiagnosticView from "./HealthDiagnosticView";
 import DashboardBuilder from "./DashboardBuilder";
 
 type InsightsResponse = {
-  kpis: Record<string, any>;
-  charts: Record<string, any>;
+  kpis: Record<string, unknown>;
+  charts: Record<string, { data: unknown[]; layout?: Record<string, unknown> }>;
   filters: Record<string, string[]>;
   ai_summary?: string | null;
+};
+
+type WorkbookMeta = {
+  sheet_names: string[];
+  sheet_count: number;
+  default_sheet: string;
 };
 
 type FileMeta = {
@@ -23,6 +29,7 @@ type FileMeta = {
   uploaded_at: string;
   size_bytes: number | null;
   status: string;
+  workbook?: WorkbookMeta | null;
 };
 
 type FiltersState = Record<string, string | null>;
@@ -33,9 +40,9 @@ const API_BASE_URL =
 
 function formatChartName(key: string): string {
   return key
-    .replace(/^timeseries_/, "Trend Over Time — ")
+    .replace(/^timeseries_/, "Trend Over Time - ")
     .replace(/^(distribution|breakdown)_\d+_/, (_, type) =>
-      type === "distribution" ? "Distribution — " : "Breakdown — "
+      type === "distribution" ? "Distribution - " : "Breakdown - "
     )
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -55,11 +62,9 @@ export default function FileInsightsPage() {
   const { theme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
-
-  // File metadata (name, size, upload date)
   const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
+  const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
 
-  // Insights tab state
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [filtersState, setFiltersState] = useState<FiltersState>({});
   const [pendingFilters, setPendingFilters] = useState<FiltersState>({});
@@ -68,65 +73,81 @@ export default function FileInsightsPage() {
 
   const hasToken = !!tokens?.accessToken;
 
-  // ---------------------------------------------------------------------------
-  // Fetch file metadata once on mount to get the file name
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!hasToken || !fileId) return;
+
     fetch(`${API_BASE_URL}/api/files/${fileId}`, {
       headers: { Authorization: `Bearer ${tokens!.accessToken}` },
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data) setFileMeta(data as FileMeta); })
-      .catch(() => {/* silent — name not critical */});
+      .then((data) => {
+        if (!data) return;
+        const nextMeta = data as FileMeta;
+        setFileMeta(nextMeta);
+        setSelectedSheet((prev) => prev ?? nextMeta.workbook?.default_sheet ?? null);
+      })
+      .catch(() => {});
   }, [hasToken, fileId, tokens]);
 
   const plotTheme = useMemo(() => {
     if (typeof document === "undefined") {
       return { fontColor: "#e2e8f0", gridColor: "rgba(226, 232, 240, 0.12)" };
     }
+
     const styles = getComputedStyle(document.documentElement);
     const textMain = styles.getPropertyValue("--text-main").trim() || "#e2e8f0";
     return {
       fontColor: textMain,
-      gridColor: theme === "dark" ? "rgba(226, 232, 240, 0.12)" : "rgba(15, 23, 42, 0.12)",
+      gridColor: theme === "dark"
+        ? "rgba(226, 232, 240, 0.12)"
+        : "rgba(15, 23, 42, 0.12)",
     };
   }, [theme]);
 
-  // ---------------------------------------------------------------------------
-  // Insights fetch
-  // ---------------------------------------------------------------------------
   const fetchInsightsWithFilters = useCallback(
     async (nextFilters: FiltersState) => {
       if (!hasToken || !fileId) return;
+
       try {
         setLoadingInsights(true);
         setInsightsError(null);
+
         const res = await fetch(`${API_BASE_URL}/api/files/${fileId}/insights`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${tokens!.accessToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ filters: nextFilters }),
+          body: JSON.stringify({
+            filters: nextFilters,
+            sheet_name: selectedSheet,
+          }),
         });
+
         if (!res.ok) {
           const text = await res.text();
           throw new Error(text || "Failed to load file overview");
         }
+
         setInsights((await res.json()) as InsightsResponse);
-      } catch (err: any) {
-        setInsightsError(err.message || "Failed to load file overview");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to load file overview";
+        setInsightsError(message);
       } finally {
         setLoadingInsights(false);
       }
     },
-    [hasToken, fileId, tokens]
+    [hasToken, fileId, selectedSheet, tokens]
   );
 
-  const fetchInsights = useCallback(() => fetchInsightsWithFilters(filtersState), [fetchInsightsWithFilters, filtersState]);
+  const fetchInsights = useCallback(
+    () => fetchInsightsWithFilters(filtersState),
+    [fetchInsightsWithFilters, filtersState]
+  );
 
-  useEffect(() => { fetchInsights(); }, [fetchInsights]);
+  useEffect(() => {
+    fetchInsights();
+  }, [fetchInsights]);
 
   useEffect(() => {
     const t = setTimeout(() => setFiltersState(pendingFilters), 500);
@@ -141,8 +162,14 @@ export default function FileInsightsPage() {
     );
   }
 
-  const { kpis, charts, filters } = insights ?? { kpis: null, charts: null, filters: {} };
+  const { kpis, charts, filters } = insights ?? {
+    kpis: null,
+    charts: null,
+    filters: {},
+  };
   const anyFilters = Object.keys(filters ?? {}).length > 0;
+  const workbook = fileMeta?.workbook ?? null;
+  const hasWorkbookSheets = !!workbook && workbook.sheet_count > 0;
 
   const handleFilterChange = (key: string, value: string | null) =>
     setPendingFilters((prev) => ({ ...prev, [key]: value === "" ? null : value }));
@@ -153,14 +180,16 @@ export default function FileInsightsPage() {
     fetchInsightsWithFilters({});
   };
 
-  // ---------------------------------------------------------------------------
-  // Build a friendly file title for the header
-  // ---------------------------------------------------------------------------
   const fileTitle = fileMeta?.original_name ?? "File Analysis";
   const fileSubtitle = fileMeta
     ? [
-        `Uploaded ${new Date(fileMeta.uploaded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+        `Uploaded ${new Date(fileMeta.uploaded_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}`,
         formatFileSize(fileMeta.size_bytes),
+        selectedSheet ? `Sheet: ${selectedSheet}` : null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -168,13 +197,12 @@ export default function FileInsightsPage() {
 
   const tabs: { id: TabId; label: string; badge?: string }[] = [
     { id: "overview", label: "File Overview" },
-    { id: "health",   label: "Data Health", badge: "Recommended" },
-    { id: "explore",  label: "Charts" },
+    { id: "health", label: "Data Health", badge: "Recommended" },
+    { id: "explore", label: "Charts" },
   ];
 
   return (
     <div className="flex w-full min-h-screen">
-      {/* Filter sidebar — overview tab only */}
       {activeTab === "overview" && anyFilters && (
         <aside className="hidden lg:flex flex-col w-64 border-r border-[var(--border)] bg-[color:var(--bg-panel)] p-4 overflow-y-auto">
           <FilterPanel
@@ -191,7 +219,6 @@ export default function FileInsightsPage() {
       )}
 
       <main className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-        {/* Page header — shows real file name */}
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-xl font-semibold text-[var(--text-main)] truncate">
@@ -203,18 +230,40 @@ export default function FileInsightsPage() {
           </div>
 
           {activeTab === "overview" && (
-            <button
-              onClick={fetchInsights}
-              disabled={loadingInsights}
-              className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-main)] hover:bg-[color:var(--bg-panel-2)] disabled:opacity-60"
-              type="button"
-            >
-              {loadingInsights ? "Refreshing…" : "Refresh"}
-            </button>
+            <div className="flex items-center gap-2">
+              {hasWorkbookSheets && (
+                <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                  <span>Sheet</span>
+                  <select
+                    value={selectedSheet ?? workbook?.default_sheet ?? ""}
+                    onChange={(e) => {
+                      setPendingFilters({});
+                      setFiltersState({});
+                      setSelectedSheet(e.target.value || null);
+                    }}
+                    className="rounded-md border border-[var(--border)] bg-[color:var(--bg-panel)] px-2 py-1.5 text-xs text-[var(--text-main)]"
+                  >
+                    {(workbook?.sheet_names ?? []).map((sheet) => (
+                      <option key={sheet} value={sheet}>
+                        {sheet}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <button
+                onClick={fetchInsights}
+                disabled={loadingInsights}
+                className="shrink-0 rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-main)] hover:bg-[color:var(--bg-panel-2)] disabled:opacity-60"
+                type="button"
+              >
+                {loadingInsights ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
           )}
         </header>
 
-        {/* Tab bar */}
         <div className="flex gap-1 border-b border-[var(--border)]">
           {tabs.map((tab) => (
             <button
@@ -238,12 +287,11 @@ export default function FileInsightsPage() {
           ))}
         </div>
 
-        {/* ── File Overview ── */}
         {activeTab === "overview" && (
           <>
             {loadingInsights && !insights && (
               <div className="py-12 text-center text-sm text-[var(--text-muted)]">
-                Loading your file…
+                Loading your file...
               </div>
             )}
 
@@ -255,7 +303,9 @@ export default function FileInsightsPage() {
 
             {kpis && Object.keys(kpis).length > 0 && (
               <section>
-                <h2 className="mb-3 text-sm font-semibold text-[var(--text-main)]">Key Metrics</h2>
+                <h2 className="mb-3 text-sm font-semibold text-[var(--text-main)]">
+                  Key Metrics
+                </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {Object.entries(kpis).map(([label, value]) => (
                     <div
@@ -264,7 +314,7 @@ export default function FileInsightsPage() {
                     >
                       <p className="text-xs font-medium text-[var(--text-muted)]">{label}</p>
                       <p className="mt-2 text-2xl font-semibold text-cyan-300">
-                        {typeof value === "number" ? value.toLocaleString() : value}
+                        {typeof value === "number" ? value.toLocaleString() : String(value)}
                       </p>
                     </div>
                   ))}
@@ -303,7 +353,11 @@ export default function FileInsightsPage() {
                             zerolinecolor: plotTheme.gridColor,
                           },
                         }}
-                        config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ["toImage", "lasso2d", "select2d"] }}
+                        config={{
+                          responsive: true,
+                          displaylogo: false,
+                          modeBarButtonsToRemove: ["toImage", "lasso2d", "select2d"],
+                        }}
                         style={{ width: "100%", height: "100%" }}
                       />
                     </div>
@@ -313,35 +367,37 @@ export default function FileInsightsPage() {
             )}
 
             {!loadingInsights && !insightsError && !insights && (
-              <div className="py-12 text-center text-sm text-[var(--text-muted)]">No data available.</div>
+              <div className="py-12 text-center text-sm text-[var(--text-muted)]">
+                No data available.
+              </div>
             )}
           </>
         )}
 
-        {/* ── Data Health ── */}
         {activeTab === "health" && (
           <HealthDiagnosticView
             fileId={fileId}
             fileName={fileTitle}
             token={tokens!.accessToken ?? ""}
+            sheetName={selectedSheet}
           />
         )}
 
-        {/* ── Explore ── */}
         {activeTab === "explore" && (
           <DashboardBuilder
             fileId={fileId}
             token={tokens!.accessToken ?? ""}
+            sheetName={selectedSheet}
           />
         )}
       </main>
 
-      {/* AI summary button — overview tab only */}
       {activeTab === "overview" && (
         <AIWidget
           fileId={fileId}
-          initialSummary={(insights as any)?.ai_summary ?? null}
+          initialSummary={insights?.ai_summary ?? null}
           token={tokens!.accessToken ?? ""}
+          sheetName={selectedSheet}
         />
       )}
     </div>

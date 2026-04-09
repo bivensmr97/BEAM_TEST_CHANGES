@@ -288,15 +288,25 @@ export default function HealthDiagnosticView({
   fileId,
   fileName,
   token,
+  sheetName,
 }: {
   fileId: string;
   fileName?: string;
   token: string;
+  sheetName?: string | null;
 }) {
-  const [health, setHealth] = useState<HealthResponse | null>(healthCache[fileId] ?? null);
-  const [loading, setLoading] = useState(!healthCache[fileId]);
+  const cacheKey = `${fileId}::${sheetName ?? "__default__"}`;
+  const [health, setHealth] = useState<HealthResponse | null>(healthCache[cacheKey] ?? null);
+  const [loading, setLoading] = useState(!healthCache[cacheKey]);
   const [error, setError] = useState<string | null>(null);
-  const hasFetched = useRef(!!healthCache[fileId]);
+  const hasFetched = useRef(!!healthCache[cacheKey]);
+
+  useEffect(() => {
+    setHealth(healthCache[cacheKey] ?? null);
+    setLoading(!healthCache[cacheKey]);
+    setError(null);
+    hasFetched.current = !!healthCache[cacheKey];
+  }, [cacheKey]);
 
   useEffect(() => {
     if (!fileId || !token || hasFetched.current) return;
@@ -318,7 +328,7 @@ export default function HealthDiagnosticView({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ sheet_name: sheetName }),
           signal: controller.signal,
         });
 
@@ -332,15 +342,17 @@ export default function HealthDiagnosticView({
 
         const data = (await res.json()) as HealthResponse;
         if (!cancelled) {
-          healthCache[fileId] = data;
+          healthCache[cacheKey] = data;
           setHealth(data);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
           const msg =
-            err.name === "AbortError"
+            err instanceof Error && err.name === "AbortError"
               ? "The analysis is taking longer than expected. Please try again — it may work on a second attempt."
-              : err.message || "We couldn't analyze this file right now.";
+              : err instanceof Error
+              ? err.message
+              : "We couldn't analyze this file right now.";
           setError(msg);
         }
       } finally {
@@ -354,11 +366,11 @@ export default function HealthDiagnosticView({
       cancelled = true;
       // If the fetch was cancelled before completing (e.g. due to a token refresh),
       // reset the flag so the next render retries with the updated token.
-      if (!healthCache[fileId]) {
+      if (!healthCache[cacheKey]) {
         hasFetched.current = false;
       }
     };
-  }, [fileId, token]);
+  }, [cacheKey, fileId, sheetName, token]);
 
   if (loading) {
     return (
@@ -387,7 +399,7 @@ export default function HealthDiagnosticView({
         <button
           type="button"
           onClick={() => {
-            delete healthCache[fileId];
+            delete healthCache[cacheKey];
             hasFetched.current = false;
             setLoading(true);
             setError(null);

@@ -453,9 +453,11 @@ function buildSuggestions(cols: ColMeta[]): Suggestion[] {
 export default function DashboardBuilder({
   fileId,
   token,
+  sheetName,
 }: {
   fileId: string;
   token: string;
+  sheetName?: string | null;
 }) {
   const { theme } = useTheme();
 
@@ -497,8 +499,14 @@ export default function DashboardBuilder({
   useEffect(() => {
     if (!fileId || !token) return;
     setColsLoading(true);
-    fetch(`${API_BASE_URL}/api/files/${fileId}/insights`, {
+    const url = new URL(`${API_BASE_URL}/api/files/${fileId}/insights`);
+    if (sheetName) {
+      url.searchParams.set("sheet_name", sheetName);
+    }
+
+    fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },
+      method: "GET",
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load file columns"))))
       .then((data) => {
@@ -507,7 +515,13 @@ export default function DashboardBuilder({
       })
       .catch((err) => setColsError(err.message ?? "Failed to load columns"))
       .finally(() => setColsLoading(false));
-  }, [fileId, token]);
+  }, [fileId, sheetName, token]);
+
+  useEffect(() => {
+    setCharts([]);
+    setRendered({});
+    setRunError(null);
+  }, [sheetName]);
 
   // ── Chart management ─────────────────────────────────────────────────────────
   const addBlankChart = useCallback(() => {
@@ -563,7 +577,7 @@ export default function DashboardBuilder({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ charts: toRun, filters: {} }),
+          body: JSON.stringify({ charts: toRun, filters: {}, sheet_name: sheetName }),
         });
 
         if (!res.ok) {
@@ -592,7 +606,7 @@ export default function DashboardBuilder({
         });
       }
     },
-    [charts, fileId, token]
+    [charts, fileId, sheetName, token]
   );
 
   const generateAll = useCallback(() => {

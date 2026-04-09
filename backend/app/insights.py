@@ -85,7 +85,7 @@ def generate_ai_summary(df: pd.DataFrame) -> str:
 # Blob loader
 # ---------------------------------------------------------------------------
 
-def load_file_from_blob(blob_path: str) -> pd.DataFrame:
+def load_file_from_blob(blob_path: str, sheet_name: str | None = None) -> pd.DataFrame:
     try:
         blob_service = BlobServiceClient.from_connection_string(settings.AZURE_BLOB_CONNSTRING)
         container = blob_service.get_container_client(settings.BLOB_CONTAINER)
@@ -98,7 +98,14 @@ def load_file_from_blob(blob_path: str) -> pd.DataFrame:
             except UnicodeDecodeError:
                 df = pd.read_csv(io.BytesIO(data), encoding="latin-1", nrows=MAX_ROWS_LOAD)
         elif path.endswith(".xlsx") or path.endswith(".xls"):
-            df = pd.read_excel(io.BytesIO(data))
+            workbook = pd.ExcelFile(io.BytesIO(data))
+            available = [str(name) for name in workbook.sheet_names]
+            selected_sheet = sheet_name or (available[0] if available else None)
+            if not selected_sheet:
+                raise HTTPException(422, "This workbook does not contain any sheets.")
+            if selected_sheet not in available:
+                raise HTTPException(404, f"Worksheet '{selected_sheet}' was not found in this workbook.")
+            df = pd.read_excel(workbook, sheet_name=selected_sheet)
             if len(df) > MAX_ROWS_LOAD:
                 df = df.head(MAX_ROWS_LOAD)
         else:
@@ -374,8 +381,8 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
 # Full insights pipeline
 # ---------------------------------------------------------------------------
 
-def generate_insights(blob_path: str, filters: dict = None) -> dict:
-    df = load_file_from_blob(blob_path)
+def generate_insights(blob_path: str, filters: dict = None, sheet_name: str | None = None) -> dict:
+    df = load_file_from_blob(blob_path, sheet_name=sheet_name)
 
     if filters:
         df = apply_filters(df, filters)

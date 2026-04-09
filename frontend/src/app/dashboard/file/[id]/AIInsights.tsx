@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface AIInsightsProps {
   fileId: string;
   initialSummary: string | null;
   token: string;
+  sheetName?: string | null;
 }
 
-export default function AIInsights({ fileId, initialSummary, token }: AIInsightsProps) {
+export default function AIInsights({ fileId, initialSummary, token, sheetName }: AIInsightsProps) {
   const [summary, setSummary] = useState<string | null>(initialSummary);
   const [loading, setLoading] = useState(false);
 
@@ -28,6 +29,7 @@ export default function AIInsights({ fileId, initialSummary, token }: AIInsights
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ sheet_name: sheetName }),
       });
 
       if (!res.ok) {
@@ -44,9 +46,6 @@ export default function AIInsights({ fileId, initialSummary, token }: AIInsights
       setLoading(false);
     }
   };
-
-  const hasText = !!summary && summary.trim().length > 0;
-
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
