@@ -35,6 +35,7 @@ class Tenant(Base):
     plan = Column(Enum(TenantPlan), nullable=False, server_default="demo")
     trial_ends_at = Column(DateTime(timezone=True))
     is_active = Column(Boolean, nullable=False, server_default="1")
+    ai_enabled = Column(Boolean, nullable=False, server_default="1")
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.sysutcdatetime())
 
@@ -51,6 +52,7 @@ class User(Base):
     display_name = Column(String(255))
     role = Column(Enum(UserRole), nullable=False, server_default="user")
     is_active = Column(Boolean, nullable=False, server_default="1")
+    ai_enabled = Column(Boolean, nullable=False, server_default="1")
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.sysutcdatetime())
 

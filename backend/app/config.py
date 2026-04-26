@@ -14,8 +14,8 @@ class Settings(BaseSettings):
 
     # --- LLM usage/cost tracking ---
     OPENAI_MODEL: str = "gpt-4o-mini"
-    LLM_DEFAULT_INPUT_PRICE_PER_1M: Optional[float] = None
-    LLM_DEFAULT_OUTPUT_PRICE_PER_1M: Optional[float] = None
+    LLM_DEFAULT_INPUT_PRICE_PER_1M: Optional[float] = 0.15
+    LLM_DEFAULT_OUTPUT_PRICE_PER_1M: Optional[float] = 0.60
 
 
     # --- JWT ---

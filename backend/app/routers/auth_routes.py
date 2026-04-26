@@ -134,4 +134,5 @@ def me(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "tenant_id": str(current_user.tenant_id),
         "role": current_user.role.value,
+        "ai_enabled": bool(current_user.ai_enabled),
     }

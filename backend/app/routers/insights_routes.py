@@ -46,4 +46,4 @@ def regenerate_ai_summary(
     sheet_name = (payload or {}).get("sheet_name")
     df = load_file_from_blob(file.blob_path, sheet_name=sheet_name)
     summary = generate_ai_summary(df, db=db, user=user, file=file, operation="ai_summary_regenerate")
-    return {"summary": summary}
+    return {"summary": summary, "detail": summary or "AI summaries are disabled or unavailable right now."}

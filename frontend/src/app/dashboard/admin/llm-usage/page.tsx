@@ -19,6 +19,15 @@ type UsageSummary = {
     total_tokens: number;
     estimated_cost: number;
   }[];
+  by_user: {
+    user_id?: string | null;
+    email: string;
+    calls: number;
+    total_tokens: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    estimated_cost: number;
+  }[];
 };
 
 type UsageEvent = {
@@ -32,6 +41,7 @@ type UsageEvent = {
   status: string;
   error_message?: string | null;
   file_id?: string | null;
+  user_email?: string | null;
   created_at: string;
 };
 
@@ -178,6 +188,43 @@ export default function LLMUsagePage() {
 
             <section className="rounded-lg border border-[var(--border)] bg-[color:var(--bg-panel)] overflow-hidden">
               <div className="border-b border-[var(--border)] px-4 py-3">
+                <h2 className="text-sm font-semibold text-[var(--text-main)]">Usage by User</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                    <tr>
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Calls</th>
+                      <th className="px-4 py-3">Tokens</th>
+                      <th className="px-4 py-3">Output Tokens</th>
+                      <th className="px-4 py-3">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.by_user.map((row) => (
+                      <tr key={row.user_id ?? row.email} className="border-t border-[var(--border)]">
+                        <td className="px-4 py-3 text-[var(--text-main)]">{row.email}</td>
+                        <td className="px-4 py-3 text-[var(--text-main)]">{row.calls.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-[var(--text-main)]">{row.total_tokens.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-[var(--text-main)]">{row.completion_tokens.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-[var(--text-main)]">{formatCost(row.estimated_cost)}</td>
+                      </tr>
+                    ))}
+                    {summary.by_user.length === 0 && (
+                      <tr>
+                        <td className="px-4 py-6 text-center text-[var(--text-muted)]" colSpan={5}>
+                          No user usage has been recorded yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-[var(--border)] bg-[color:var(--bg-panel)] overflow-hidden">
+              <div className="border-b border-[var(--border)] px-4 py-3">
                 <h2 className="text-sm font-semibold text-[var(--text-main)]">Recent Events</h2>
               </div>
               <div className="overflow-x-auto">
@@ -185,6 +232,7 @@ export default function LLMUsagePage() {
                   <thead className="text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
                     <tr>
                       <th className="px-4 py-3">Time</th>
+                      <th className="px-4 py-3">User</th>
                       <th className="px-4 py-3">Operation</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Tokens</th>
@@ -197,6 +245,7 @@ export default function LLMUsagePage() {
                         <td className="px-4 py-3 text-[var(--text-muted)]">
                           {new Date(event.created_at).toLocaleString()}
                         </td>
+                        <td className="px-4 py-3 text-[var(--text-main)]">{event.user_email ?? "Unknown user"}</td>
                         <td className="px-4 py-3 text-[var(--text-main)]">{event.operation}</td>
                         <td className="px-4 py-3 text-[var(--text-main)]">{event.status}</td>
                         <td className="px-4 py-3 text-[var(--text-main)]">{event.total_tokens.toLocaleString()}</td>

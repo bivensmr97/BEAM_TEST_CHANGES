@@ -38,7 +38,7 @@ export default function AIInsights({ fileId, initialSummary, token, sheetName }:
       }
 
       const data = await res.json();
-      setSummary(data.summary ?? null);
+      setSummary(data.summary ?? data.detail ?? null);
     } catch (err) {
       console.error("AI summary error:", err);
       setSummary("AI summary unavailable right now.");

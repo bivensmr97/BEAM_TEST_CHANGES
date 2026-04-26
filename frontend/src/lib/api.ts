@@ -12,6 +12,7 @@ export interface MeResponse {
   email: string;
   tenant_id: string;
   role: "admin" | "user";
+  ai_enabled: boolean;
 }
 
 export interface FileItem {

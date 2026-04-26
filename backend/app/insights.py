@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from azure.storage.blob import BlobServiceClient
 from sqlalchemy.orm import Session
 from app.config import get_settings
-from app.models import File, LLMPricing, LLMUsageEvent, User
+from app.models import File, LLMPricing, LLMUsageEvent, Tenant, User
 
 settings = get_settings()
 
@@ -142,6 +142,36 @@ def generate_ai_summary(
     user_id = getattr(user, "id", None)
     file_id = getattr(file, "id", None)
 
+    if db is not None and user is not None:
+        try:
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+            if tenant and not tenant.ai_enabled:
+                _log_llm_usage(
+                    db,
+                    tenant_id,
+                    user_id,
+                    file_id,
+                    operation,
+                    model,
+                    status="skipped",
+                    error_message="AI is disabled for this tenant.",
+                )
+                return None
+            if not user.ai_enabled:
+                _log_llm_usage(
+                    db,
+                    tenant_id,
+                    user_id,
+                    file_id,
+                    operation,
+                    model,
+                    status="skipped",
+                    error_message="AI is disabled for this user.",
+                )
+                return None
+        except Exception:
+            db.rollback()
+
     if not API_KEY:
         _log_llm_usage(
             db,
@@ -184,7 +214,8 @@ def generate_ai_summary(
             completion_tokens=completion_tokens,
             status="success",
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else None
     except Exception as ex:
         _log_llm_usage(
             db,
