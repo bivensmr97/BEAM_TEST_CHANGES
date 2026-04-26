@@ -3,6 +3,7 @@ import os
 import re
 import json
 import math
+from decimal import Decimal
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -10,7 +11,9 @@ import plotly.graph_objects as go
 from openai import OpenAI
 from fastapi import HTTPException
 from azure.storage.blob import BlobServiceClient
+from sqlalchemy.orm import Session
 from app.config import get_settings
+from app.models import File, LLMPricing, LLMUsageEvent, User
 
 settings = get_settings()
 
@@ -56,9 +59,100 @@ def _friendly_col_name(col: str) -> str:
 # AI Summary
 # ---------------------------------------------------------------------------
 
-def generate_ai_summary(df: pd.DataFrame) -> str:
+def _active_pricing(db: Session | None, model: str) -> tuple[Decimal, Decimal]:
+    if db is not None:
+        try:
+            pricing = (
+                db.query(LLMPricing)
+                .filter(LLMPricing.model == model, LLMPricing.is_active == True)
+                .order_by(LLMPricing.effective_at.desc())
+                .first()
+            )
+            if pricing:
+                return Decimal(pricing.input_price_per_1m), Decimal(pricing.output_price_per_1m)
+        except Exception:
+            pass
+
+    input_price = settings.LLM_DEFAULT_INPUT_PRICE_PER_1M
+    output_price = settings.LLM_DEFAULT_OUTPUT_PRICE_PER_1M
+    return (
+        Decimal(str(input_price or 0)),
+        Decimal(str(output_price or 0)),
+    )
+
+
+def _estimate_cost(
+    db: Session | None,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> Decimal:
+    input_price, output_price = _active_pricing(db, model)
+    return (
+        (Decimal(prompt_tokens) / Decimal(1_000_000)) * input_price
+        + (Decimal(completion_tokens) / Decimal(1_000_000)) * output_price
+    ).quantize(Decimal("0.00000001"))
+
+
+def _log_llm_usage(
+    db: Session | None,
+    tenant_id,
+    user_id,
+    file_id,
+    operation: str,
+    model: str,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    status: str = "success",
+    error_message: str | None = None,
+) -> None:
+    if db is None or tenant_id is None:
+        return
+
+    try:
+        event = LLMUsageEvent(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            file_id=file_id,
+            operation=operation,
+            model=model,
+            prompt_tokens=int(prompt_tokens or 0),
+            completion_tokens=int(completion_tokens or 0),
+            total_tokens=int((prompt_tokens or 0) + (completion_tokens or 0)),
+            estimated_cost=_estimate_cost(db, model, int(prompt_tokens or 0), int(completion_tokens or 0)),
+            status=status,
+            error_message=(error_message or None)[:1000] if error_message else None,
+        )
+        db.add(event)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
+def generate_ai_summary(
+    df: pd.DataFrame,
+    db: Session | None = None,
+    user: User | None = None,
+    file: File | None = None,
+    operation: str = "ai_summary",
+) -> str:
     API_KEY = os.getenv("OPENAI_API_KEY")
+    model = settings.OPENAI_MODEL
+    tenant_id = getattr(user, "tenant_id", None) or getattr(file, "tenant_id", None)
+    user_id = getattr(user, "id", None)
+    file_id = getattr(file, "id", None)
+
     if not API_KEY:
+        _log_llm_usage(
+            db,
+            tenant_id,
+            user_id,
+            file_id,
+            operation,
+            model,
+            status="skipped",
+            error_message="OPENAI_API_KEY is not configured.",
+        )
         return None
 
     try:
@@ -72,12 +166,36 @@ def generate_ai_summary(df: pd.DataFrame) -> str:
             f"Columns: {col_info}\n\nSample rows:\n{sample}"
         )
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
         )
+        usage = getattr(response, "usage", None)
+        prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        _log_llm_usage(
+            db,
+            tenant_id,
+            user_id,
+            file_id,
+            operation,
+            model,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            status="success",
+        )
         return response.choices[0].message.content.strip()
-    except Exception:
+    except Exception as ex:
+        _log_llm_usage(
+            db,
+            tenant_id,
+            user_id,
+            file_id,
+            operation,
+            model,
+            status="error",
+            error_message=str(ex),
+        )
         return None
 
 
@@ -381,7 +499,14 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
 # Full insights pipeline
 # ---------------------------------------------------------------------------
 
-def generate_insights(blob_path: str, filters: dict = None, sheet_name: str | None = None) -> dict:
+def generate_insights(
+    blob_path: str,
+    filters: dict = None,
+    sheet_name: str | None = None,
+    db: Session | None = None,
+    user: User | None = None,
+    file: File | None = None,
+) -> dict:
     df = load_file_from_blob(blob_path, sheet_name=sheet_name)
 
     if filters:
@@ -393,7 +518,13 @@ def generate_insights(blob_path: str, filters: dict = None, sheet_name: str | No
         "kpis":      compute_kpis(df),
         "charts":    build_charts(df_for_charts),
         "filters":   extract_filters(df),
-        "ai_summary": generate_ai_summary(df_for_charts),
+        "ai_summary": generate_ai_summary(
+            df_for_charts,
+            db=db,
+            user=user,
+            file=file,
+            operation="file_overview_ai_summary",
+        ),
         "debug": {
             "version":              "insights_py_2026-04-03_v4",
             "rows":                 int(df.shape[0]),

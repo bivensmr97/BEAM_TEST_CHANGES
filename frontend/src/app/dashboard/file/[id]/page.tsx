@@ -391,6 +391,7 @@ export default function FileInsightsPage() {
             fileId={fileId}
             token={tokens!.accessToken ?? ""}
             sheetName={selectedSheet}
+            onSheetChange={setSelectedSheet}
           />
         )}
       </main>

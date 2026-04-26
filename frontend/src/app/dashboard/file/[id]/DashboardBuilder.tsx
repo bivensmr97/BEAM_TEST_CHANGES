@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Plot from "@/components/PlotNoTypes";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -28,6 +28,24 @@ type ChartConfig = {
   y: string;
   agg: AggFunc;
   color_by: string;
+};
+
+type SavedReport = {
+  id: string;
+  file_id: string;
+  name: string;
+  description?: string | null;
+  chart_configs: ChartConfig[];
+  filters: Record<string, unknown>;
+  sheet_name?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type PlotFigure = {
+  data?: unknown[];
+  layout?: Record<string, unknown>;
 };
 
 // ── Chart type metadata ────────────────────────────────────────────────────────
@@ -117,6 +135,10 @@ const AGG_OPTIONS: { label: string; desc: string; value: AggFunc }[] = [
 
 const makeId = () => Math.random().toString(36).slice(2, 10);
 
+function errorMessage(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
+
 // ── Validation ─────────────────────────────────────────────────────────────────
 
 function validate(cfg: ChartConfig, numCols: string[]): string | null {
@@ -193,7 +215,7 @@ function ChartCard({
 }: {
   cfg: ChartConfig;
   cols: ColMeta[];
-  renderedFig: any | null;
+  renderedFig: PlotFigure | null;
   isRunning: boolean;
   onUpdate: (patch: Partial<ChartConfig>) => void;
   onRemove: () => void;
@@ -454,21 +476,31 @@ export default function DashboardBuilder({
   fileId,
   token,
   sheetName,
+  onSheetChange,
 }: {
   fileId: string;
   token: string;
   sheetName?: string | null;
+  onSheetChange?: (sheetName: string | null) => void;
 }) {
   const { theme } = useTheme();
+  const restoringReportRef = useRef(false);
 
   const [cols, setCols] = useState<ColMeta[]>([]);
   const [colsLoading, setColsLoading] = useState(true);
   const [colsError, setColsError] = useState<string | null>(null);
 
   const [charts, setCharts] = useState<ChartConfig[]>([]);
-  const [rendered, setRendered] = useState<Record<string, any>>({});
+  const [rendered, setRendered] = useState<Record<string, PlotFigure>>({});
   const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
   const [runError, setRunError] = useState<string | null>(null);
+
+  const [reports, setReports] = useState<SavedReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportName, setReportName] = useState("");
+  const [currentReportId, setCurrentReportId] = useState<string | null>(null);
+  const [savingReport, setSavingReport] = useState(false);
 
   const numCols = cols.filter((c) => c.inferred_type === "numeric");
   const catCols = cols.filter((c) => c.inferred_type === "categorical");
@@ -517,10 +549,40 @@ export default function DashboardBuilder({
       .finally(() => setColsLoading(false));
   }, [fileId, sheetName, token]);
 
+  const fetchReports = useCallback(async () => {
+    if (!fileId || !token) return;
+    setReportsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/files/${fileId}/reports`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || "Could not load saved reports");
+      }
+      const data = (await res.json()) as SavedReport[];
+      setReports(data);
+      setReportError(null);
+    } catch (err: unknown) {
+      setReportError(errorMessage(err, "Could not load saved reports"));
+    } finally {
+      setReportsLoading(false);
+    }
+  }, [fileId, token]);
+
   useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
+
+  useEffect(() => {
+    if (restoringReportRef.current) {
+      restoringReportRef.current = false;
+      return;
+    }
     setCharts([]);
     setRendered({});
     setRunError(null);
+    setCurrentReportId(null);
   }, [sheetName]);
 
   // ── Chart management ─────────────────────────────────────────────────────────
@@ -562,9 +624,9 @@ export default function DashboardBuilder({
   }, []);
 
   // ── Generate charts ──────────────────────────────────────────────────────────
-  const generateCharts = useCallback(
-    async (ids: string[]) => {
-      const toRun = charts.filter((c) => ids.includes(c.id));
+  const generateChartConfigs = useCallback(
+    async (configs: ChartConfig[], ids: string[], overrideSheetName?: string | null) => {
+      const toRun = configs.filter((c) => ids.includes(c.id));
       if (!toRun.length) return;
 
       setRunError(null);
@@ -577,7 +639,11 @@ export default function DashboardBuilder({
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ charts: toRun, filters: {}, sheet_name: sheetName }),
+          body: JSON.stringify({
+            charts: toRun,
+            filters: {},
+            sheet_name: overrideSheetName === undefined ? sheetName : overrideSheetName,
+          }),
         });
 
         if (!res.ok) {
@@ -585,8 +651,8 @@ export default function DashboardBuilder({
           throw new Error(text || "Chart generation failed");
         }
 
-        const data = await res.json();
-        const newFigs: Record<string, any> = data.charts ?? {};
+        const data = (await res.json()) as { charts?: Record<string, PlotFigure> };
+        const newFigs: Record<string, PlotFigure> = data.charts ?? {};
 
         setRendered((prev) => ({ ...prev, ...newFigs }));
 
@@ -596,8 +662,8 @@ export default function DashboardBuilder({
             `${missing.length} chart${missing.length > 1 ? "s" : ""} couldn't be built — check that the selected fields are compatible with the chart type chosen.`
           );
         }
-      } catch (err: any) {
-        setRunError(err.message ?? "Something went wrong generating your charts. Please try again.");
+      } catch (err: unknown) {
+        setRunError(errorMessage(err, "Something went wrong generating your charts. Please try again."));
       } finally {
         setRunningIds((prev) => {
           const next = new Set(prev);
@@ -606,7 +672,14 @@ export default function DashboardBuilder({
         });
       }
     },
-    [charts, fileId, sheetName, token]
+    [fileId, sheetName, token]
+  );
+
+  const generateCharts = useCallback(
+    async (ids: string[]) => {
+      await generateChartConfigs(charts, ids);
+    },
+    [charts, generateChartConfigs]
   );
 
   const generateAll = useCallback(() => {
@@ -615,6 +688,110 @@ export default function DashboardBuilder({
       .map((c) => c.id);
     generateCharts(validIds);
   }, [charts, numCols, generateCharts]);
+
+  const saveReport = useCallback(
+    async (mode: "save" | "save-as") => {
+      const name = reportName.trim();
+      if (!name) {
+        setReportError("Name this report before saving.");
+        return;
+      }
+      if (!charts.length) {
+        setReportError("Add at least one chart before saving a report.");
+        return;
+      }
+
+      const updating = mode === "save" && currentReportId;
+      setSavingReport(true);
+      try {
+        const res = await fetch(
+          updating
+            ? `${API_BASE_URL}/api/files/${fileId}/reports/${currentReportId}`
+            : `${API_BASE_URL}/api/files/${fileId}/reports`,
+          {
+            method: updating ? "PUT" : "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name,
+              chart_configs: charts,
+              filters: {},
+              sheet_name: sheetName,
+            }),
+          }
+        );
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || "Could not save report");
+        }
+        const saved = (await res.json()) as SavedReport;
+        setCurrentReportId(saved.id);
+        setReportName(saved.name);
+        setReportError(null);
+        await fetchReports();
+      } catch (err: unknown) {
+        setReportError(errorMessage(err, "Could not save report"));
+      } finally {
+        setSavingReport(false);
+      }
+    },
+    [charts, currentReportId, fetchReports, fileId, reportName, sheetName, token]
+  );
+
+  const loadReport = useCallback(
+    async (reportId: string) => {
+      if (!reportId) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/files/${fileId}/reports/${reportId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || "Could not load report");
+        }
+        const report = (await res.json()) as SavedReport;
+        if (report.sheet_name !== sheetName && onSheetChange) {
+          restoringReportRef.current = true;
+          onSheetChange(report.sheet_name ?? null);
+        }
+        const nextCharts = report.chart_configs ?? [];
+        setCharts(nextCharts);
+        setRendered({});
+        setCurrentReportId(report.id);
+        setReportName(report.name);
+        setReportError(null);
+        const validIds = nextCharts
+          .filter((c) => !validate(c, numCols.map((n) => n.name)))
+          .map((c) => c.id);
+        await generateChartConfigs(nextCharts, validIds, report.sheet_name ?? null);
+      } catch (err: unknown) {
+        setReportError(errorMessage(err, "Could not load report"));
+      }
+    },
+    [fileId, generateChartConfigs, numCols, onSheetChange, sheetName, token]
+  );
+
+  const deleteCurrentReport = useCallback(async () => {
+    if (!currentReportId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/files/${fileId}/reports/${currentReportId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || "Could not delete report");
+      }
+      setCurrentReportId(null);
+      setReportName("");
+      setReportError(null);
+      await fetchReports();
+    } catch (err: unknown) {
+      setReportError(errorMessage(err, "Could not delete report"));
+    }
+  }, [currentReportId, fetchReports, fileId, token]);
 
   const anyRunning = runningIds.size > 0;
   const validChartCount = charts.filter(
@@ -673,17 +850,85 @@ export default function DashboardBuilder({
         </div>
       </div>
 
-      {/* ── Session notice ── */}
-      <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[color:var(--bg-panel)] px-3 py-2 text-xs text-[var(--text-muted)]">
-        <span>ℹ</span>
-        <span>Charts are for this session only — take a screenshot or download the chart image to save your work.</span>
+      {/* Saved report controls */}
+      <div className="rounded-lg border border-[var(--border)] bg-[color:var(--bg-panel)] p-3">
+        <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_auto] lg:items-end">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
+              Report name
+            </span>
+            <input
+              value={reportName}
+              onChange={(e) => setReportName(e.target.value)}
+              className="rounded-md border border-[var(--border)] bg-[color:var(--bg-main)] px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-cyan-400"
+              placeholder="e.g. Executive KPI dashboard"
+              maxLength={200}
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
+              Load saved report
+            </span>
+            <select
+              value={currentReportId ?? ""}
+              onChange={(e) => loadReport(e.target.value)}
+              disabled={reportsLoading}
+              className="rounded-md border border-[var(--border)] bg-[color:var(--bg-main)] px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-cyan-400"
+            >
+              <option value="">{reportsLoading ? "Loading reports..." : "Choose report"}</option>
+              {reports.map((report) => (
+                <option key={report.id} value={report.id}>
+                  {report.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => saveReport("save")}
+              disabled={savingReport || !charts.length}
+              className="rounded-md bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-white text-sm font-semibold px-3 py-2 transition-colors"
+            >
+              {savingReport ? "Saving..." : currentReportId ? "Save" : "Save Report"}
+            </button>
+            <button
+              type="button"
+              onClick={() => saveReport("save-as")}
+              disabled={savingReport || !charts.length}
+              className="rounded-md border border-[var(--border)] text-[var(--text-main)] hover:bg-[color:var(--bg-panel-2)] disabled:opacity-40 text-sm px-3 py-2 transition-colors"
+            >
+              Save As
+            </button>
+            {currentReportId && (
+              <button
+                type="button"
+                onClick={deleteCurrentReport}
+                className="rounded-md border border-red-500/40 text-red-300 hover:bg-red-500/10 text-sm px-3 py-2 transition-colors"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Error banner ── */}
-      {runError && (
+      {(runError || reportError) && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-300 flex items-start justify-between gap-3">
-          <span>{runError}</span>
-          <button type="button" onClick={() => setRunError(null)} className="shrink-0 text-amber-400 hover:text-amber-200">✕</button>
+          <span>{runError || reportError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setRunError(null);
+              setReportError(null);
+            }}
+            className="shrink-0 text-amber-400 hover:text-amber-200"
+          >
+            x
+          </button>
         </div>
       )}
 
@@ -693,7 +938,7 @@ export default function DashboardBuilder({
           <div className="text-center">
             <p className="text-sm font-medium text-[var(--text-main)]">What do you want to explore?</p>
             <p className="mt-1 text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-              Start with a suggested chart below, or click "+ Add Chart" to build your own.
+              Start with a suggested chart below, or click &quot;+ Add Chart&quot; to build your own.
             </p>
           </div>
 

@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 import urllib.parse
 import os
 
@@ -10,6 +11,11 @@ class Settings(BaseSettings):
     AZURE_BLOB_CONNSTRING: str
     BLOB_CONTAINER: str = "tenant-files"
     #OPENAI_KEY: str should be handled within ACA env now.
+
+    # --- LLM usage/cost tracking ---
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    LLM_DEFAULT_INPUT_PRICE_PER_1M: Optional[float] = None
+    LLM_DEFAULT_OUTPUT_PRICE_PER_1M: Optional[float] = None
 
 
     # --- JWT ---

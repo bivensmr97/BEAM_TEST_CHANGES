@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import React, { useMemo, useState } from "react";
@@ -104,6 +105,21 @@ export default function TopNav() {
                   <option value="light">Light</option>
                   <option value="dark">Dark</option>
                 </select>
+
+                {user.role === "admin" && (
+                  <Link
+                    href="/dashboard/admin/llm-usage"
+                    onClick={() => setOpenSettings(false)}
+                    className="mt-3 block w-full rounded-md px-3 py-2 text-xs font-medium text-center"
+                    style={{
+                      border: "1px solid var(--border)",
+                      background: "transparent",
+                      color: "var(--text-main)",
+                    }}
+                  >
+                    AI Usage
+                  </Link>
+                )}
 
                 <button
                   type="button"

@@ -5,6 +5,8 @@ from app.db import init_db
 from app.routers.auth_routes import router as auth_router
 from app.routers.files import router as files_router
 from app.routers.insights_routes import router as insights_router
+from app.routers.reports import router as reports_router
+from app.routers.admin import router as admin_router
 
 
 app = FastAPI(
@@ -31,3 +33,5 @@ def health():
 app.include_router(auth_router)
 app.include_router(files_router, prefix="/api/files", tags=["files"])
 app.include_router(insights_router)
+app.include_router(reports_router)
+app.include_router(admin_router)

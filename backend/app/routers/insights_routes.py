@@ -26,7 +26,7 @@ async def get_file_insights(
     filters = payload.get("filters", {})
     sheet_name = payload.get("sheet_name")
 
-    return generate_insights(file.blob_path, filters, sheet_name=sheet_name)
+    return generate_insights(file.blob_path, filters, sheet_name=sheet_name, db=db, user=user, file=file)
 
 @router.post("/{file_id}/ai-summary")
 def regenerate_ai_summary(
@@ -45,5 +45,5 @@ def regenerate_ai_summary(
 
     sheet_name = (payload or {}).get("sheet_name")
     df = load_file_from_blob(file.blob_path, sheet_name=sheet_name)
-    summary = generate_ai_summary(df)
+    summary = generate_ai_summary(df, db=db, user=user, file=file, operation="ai_summary_regenerate")
     return {"summary": summary}
