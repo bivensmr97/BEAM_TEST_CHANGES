@@ -22,7 +22,7 @@ export default function Sidebar({
         className="flex h-10 w-full items-center justify-center border-b border-[var(--border)] text-sm font-semibold tracking-wide text-[var(--text-muted)] hover:text-[var(--text-main)]"
         type="button"
       >
-        {open ? "<<" : ">>"}
+        {open ? "← Collapse" : "→"}
       </button>
 
       {/* Sidebar Content (hidden when collapsed) */}

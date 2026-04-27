@@ -160,7 +160,7 @@ function CategoryBar({ label, score, explanation }: { label: string; score: numb
         />
       </div>
       {explanation && (
-        <p className="text-[11px] text-[var(--text-muted)]">{explanation}</p>
+        <p className="text-xs text-[var(--text-muted)]">{explanation}</p>
       )}
     </div>
   );
@@ -188,7 +188,7 @@ function CardinalityBadge({ cls }: { cls: string }) {
     unique: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
   };
   return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium capitalize ${map[cls] ?? map.medium}`}>
+    <span className={`rounded px-1.5 py-0.5 text-xs font-medium capitalize ${map[cls] ?? map.medium}`}>
       {cls}
     </span>
   );

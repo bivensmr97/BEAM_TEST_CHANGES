@@ -299,7 +299,7 @@ export default function DedupePanel({
         </div>
       )}
 
-      <p className="text-[11px] text-[var(--text-muted)]">
+      <p className="text-xs text-[var(--text-muted)]">
         Your original file is never modified. The cleaned copy is downloaded to your device.
       </p>
     </div>
@@ -323,7 +323,7 @@ function Stat({
       : "text-[var(--text-main)]";
   return (
     <div className="space-y-0.5">
-      <p className="text-[11px] text-[var(--text-muted)]">{label}</p>
+      <p className="text-xs text-[var(--text-muted)]">{label}</p>
       <p className={`text-lg font-semibold ${color}`}>{value}</p>
     </div>
   );

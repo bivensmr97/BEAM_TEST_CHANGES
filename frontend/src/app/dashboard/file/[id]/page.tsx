@@ -282,7 +282,7 @@ export default function FileInsightsPage() {
             >
               {tab.label}
               {tab.badge && activeTab !== tab.id && (
-                <span className="ml-2 inline-block rounded-full bg-cyan-500/20 border border-cyan-500/40 px-1.5 py-0 text-[10px] font-semibold text-cyan-300 leading-4">
+                <span className="ml-2 inline-block rounded-full bg-cyan-500/20 border border-cyan-500/40 px-1.5 py-0 text-xs font-semibold text-cyan-300 leading-4">
                   ✓
                 </span>
               )}

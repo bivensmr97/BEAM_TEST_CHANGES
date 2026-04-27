@@ -57,7 +57,7 @@ export default function FilterPanel({
       {/* Filter Inputs */}
       {filterKeys.map((col) => (
         <div key={col} className="flex flex-col gap-1">
-          <label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+          <label className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
             {col}
           </label>
 

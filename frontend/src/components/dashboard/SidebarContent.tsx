@@ -64,22 +64,35 @@ export default function SidebarContent() {
         </h2>
 
         <form onSubmit={handleUpload} className="space-y-3">
-          <input
-            type="file"
-            accept=".csv,.xlsx"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-[var(--text-main)] file:bg-cyan-500 file:text-[var(--dark-text)] file:rounded file:px-3 file:py-1"
-          />
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs text-[var(--text-muted)]">CSV or Excel file (.xlsx), max 50 MB</span>
+            <input
+              type="file"
+              accept=".csv,.xlsx"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-[var(--text-main)] file:mr-3 file:border-0 file:bg-cyan-500 file:text-[var(--dark-text)] file:font-semibold file:rounded file:px-3 file:py-1.5 file:cursor-pointer hover:file:bg-cyan-400"
+            />
+          </label>
+
+          {selectedFile && (
+            <p className="text-xs text-[var(--text-muted)] truncate">
+              Selected: <span className="text-[var(--text-main)]">{selectedFile.name}</span>
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={!selectedFile || uploading}
-            className="w-full bg-cyan-500 hover:bg-cyan-400 text-[var(--dark-text)] font-semibold rounded py-2 text-sm disabled:opacity-50"
+            className="w-full bg-cyan-500 hover:bg-cyan-400 text-[var(--dark-text)] font-semibold rounded-md py-2 text-sm disabled:opacity-50 transition-colors"
           >
-            {uploading ? "Uploading..." : "Upload"}
+            {uploading ? "Uploading…" : "Upload File"}
           </button>
 
-          {error && <p className="text-red-300 text-xs">{error}</p>}
+          {error && (
+            <p className="rounded-md border border-red-500/40 bg-red-950/20 px-2 py-1.5 text-xs text-red-300">
+              {error}
+            </p>
+          )}
         </form>
       </section>
 

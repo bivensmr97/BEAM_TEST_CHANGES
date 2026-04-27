@@ -38,9 +38,9 @@
   --bg-panel-2: #0a1020;
 
   --text-main: #e2e8f0;
-  --text-muted: rgba(226, 232, 240, 0.72);
+  --text-muted: rgba(226, 232, 240, 0.82);
 
-  --border: rgba(0, 163, 224, 0.28);
+  --border: rgba(0, 163, 224, 0.36);
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
 
   --header-bg: var(--navy);

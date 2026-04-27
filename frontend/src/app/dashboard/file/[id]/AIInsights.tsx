@@ -59,7 +59,7 @@ export default function AIInsights({ fileId, initialSummary, token, sheetName }:
           className="rounded-md border border-[var(--border)] px-3 py-1 text-xs hover:bg-[color:var(--bg-panel-2)] disabled:opacity-60 shrink-0"
           type="button"
         >
-          {loading ? "Generating…" : "Regenerate"}
+          {loading ? "Generating…" : summary ? "Regenerate" : "Generate summary"}
         </button>
       </div>
 
@@ -74,24 +74,15 @@ export default function AIInsights({ fileId, initialSummary, token, sheetName }:
       >
         {/* Bubble header */}
         <div className="px-4 py-2 border-b border-cyan-500/20">
-          <div className="text-[11px] uppercase tracking-wide text-cyan-300/90">
-            Summary
+          <div className="text-xs uppercase tracking-wide text-cyan-300">
+            AI Summary
           </div>
         </div>
 
-        {/* Bubble body (auto height until it hits max, then scrolls) */}
+        {/* Bubble body */}
         <div className="px-4 py-3">
-          <div className="max-h-[45vh] overflow-y-auto pr-2">
-            <div
-  className="
-    text-sm text-[var(--text-main)] whitespace-pre-wrap
-    max-h-[45vh] overflow-y-auto pr-2
-    scrollbar-ai
-  "
->
-  {summary ?? "No AI summary available yet."}
-</div>
-
+          <div className="max-h-[45vh] overflow-y-auto pr-2 scrollbar-ai text-sm text-[var(--text-main)] whitespace-pre-wrap leading-relaxed">
+            {summary ?? "No summary yet — click \"Generate summary\" above."}
           </div>
         </div>
       </div>

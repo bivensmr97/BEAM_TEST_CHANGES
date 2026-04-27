@@ -181,7 +181,7 @@ function ColSelect({
 }) {
   return (
     <label className="flex flex-col gap-1 min-w-0">
-      <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
+      <span className="text-xs uppercase tracking-wide font-medium text-[var(--text-muted)]">
         {label}
         {required && <span className="text-red-400 ml-0.5">*</span>}
       </span>
@@ -316,7 +316,7 @@ function ChartCard({
 
           {meta.showAgg && (
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
+              <span className="text-xs uppercase tracking-wide font-medium text-[var(--text-muted)]">
                 Summarise by
               </span>
               <select
@@ -345,7 +345,7 @@ function ChartCard({
         </div>
 
         {/* Hint */}
-        <p className="mt-2.5 text-[11px] text-[var(--text-muted)] leading-relaxed italic">
+        <p className="mt-2.5 text-xs text-[var(--text-muted)] leading-relaxed italic">
           {meta.hint}
         </p>
 
@@ -829,11 +829,11 @@ export default function DashboardBuilder({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {charts.length > 0 && (
+          {charts.length > 0 && validChartCount > 0 && (
             <button
               type="button"
               onClick={generateAll}
-              disabled={anyRunning || validChartCount === 0}
+              disabled={anyRunning}
               className="rounded-md border border-cyan-500/50 bg-cyan-500/10 hover:bg-cyan-500/20 disabled:opacity-40 text-cyan-300 text-sm font-medium px-4 py-2 transition-colors"
             >
               {anyRunning ? "Building…" : `Generate All (${validChartCount})`}
@@ -854,7 +854,7 @@ export default function DashboardBuilder({
       <div className="rounded-lg border border-[var(--border)] bg-[color:var(--bg-panel)] p-3">
         <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_auto] lg:items-end">
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
+            <span className="text-xs uppercase tracking-wide font-medium text-[var(--text-muted)]">
               Report name
             </span>
             <input
@@ -867,7 +867,7 @@ export default function DashboardBuilder({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-wide font-medium text-[var(--text-muted)]">
+            <span className="text-xs uppercase tracking-wide font-medium text-[var(--text-muted)]">
               Load saved report
             </span>
             <select
@@ -926,8 +926,9 @@ export default function DashboardBuilder({
               setReportError(null);
             }}
             className="shrink-0 text-amber-400 hover:text-amber-200"
+            aria-label="Dismiss"
           >
-            x
+            ✕
           </button>
         </div>
       )}
@@ -945,7 +946,7 @@ export default function DashboardBuilder({
           {/* Suggested charts */}
           {suggestions.length > 0 && (
             <div>
-              <p className="text-[10px] uppercase tracking-wide font-semibold text-[var(--text-muted)] mb-2">
+              <p className="text-xs uppercase tracking-wide font-semibold text-[var(--text-muted)] mb-2">
                 Suggested for your data
               </p>
               <div className="grid gap-3 sm:grid-cols-3">
@@ -962,7 +963,7 @@ export default function DashboardBuilder({
                     <p className="mt-1 text-xs text-[var(--text-muted)] leading-relaxed">
                       {s.description}
                     </p>
-                    <p className="mt-2 text-[10px] text-cyan-500 font-medium">
+                    <p className="mt-2 text-xs text-cyan-500 font-medium">
                       {CHART_META[s.config.chart_type].label} →
                     </p>
                   </button>
@@ -984,19 +985,19 @@ export default function DashboardBuilder({
           {/* Field summary */}
           <div className="flex flex-wrap justify-center gap-2 pt-2 border-t border-[var(--border)]">
             {numCols.length > 0 && (
-              <span className="text-[11px] text-[var(--text-muted)]">
+              <span className="text-xs text-[var(--text-muted)]">
                 <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 mr-1" />
                 {numCols.length} number field{numCols.length > 1 ? "s" : ""}
               </span>
             )}
             {catCols.length > 0 && (
-              <span className="text-[11px] text-[var(--text-muted)]">
+              <span className="text-xs text-[var(--text-muted)]">
                 <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1" />
                 {catCols.length} category field{catCols.length > 1 ? "s" : ""}
               </span>
             )}
             {dateCols.length > 0 && (
-              <span className="text-[11px] text-[var(--text-muted)]">
+              <span className="text-xs text-[var(--text-muted)]">
                 <span className="inline-block w-2 h-2 rounded-full bg-purple-400 mr-1" />
                 {dateCols.length} date field{dateCols.length > 1 ? "s" : ""}
               </span>
@@ -1028,7 +1029,7 @@ export default function DashboardBuilder({
           <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">
             Fields in this file
           </p>
-          <div className="flex flex-wrap gap-4 text-[11px] text-[var(--text-muted)]">
+          <div className="flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
             {numCols.length > 0 && (
               <span>
                 <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 mr-1" />

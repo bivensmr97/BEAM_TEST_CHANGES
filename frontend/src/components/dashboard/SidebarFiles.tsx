@@ -16,6 +16,18 @@ type FileSummary = {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+const STATUS_LABELS: Record<string, string> = {
+  ready: "Ready",
+  processing: "Processing…",
+  error: "Error",
+  pending: "Pending",
+  uploaded: "Ready",
+};
+
+function friendlyStatus(status: string): string {
+  return STATUS_LABELS[status?.toLowerCase()] ?? status;
+}
+
 export default function SidebarFiles({ reloadFlag }: { reloadFlag: number }) {
   const [files, setFiles] = useState<FileSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,8 +164,8 @@ export default function SidebarFiles({ reloadFlag }: { reloadFlag: number }) {
             >
               <Link href={href} className="flex-1 min-w-0">
                 <div className="truncate">{file.original_name}</div>
-                <div className="mt-0.5 text-[11px] text-(--text-muted) flex justify-between">
-                  <span>{file.status}</span>
+                <div className="mt-0.5 text-xs text-(--text-muted) flex justify-between">
+                  <span>{friendlyStatus(file.status)}</span>
                   <span>
                     {dateLabel} • {timeLabel}
                   </span>

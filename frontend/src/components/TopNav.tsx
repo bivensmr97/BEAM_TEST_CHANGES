@@ -98,7 +98,7 @@ export default function TopNav() {
 
         {envBadge && (
           <span
-            className="ml-3 rounded-md px-2 py-1 text-[10px] font-semibold"
+            className="ml-3 rounded-md px-2 py-1 text-xs font-semibold"
             style={{
               border: "1px solid rgba(255,255,255,0.25)",
               background: "rgba(0,0,0,0.15)",
@@ -189,13 +189,13 @@ export default function TopNav() {
                   </label>
 
                   {aiSettings && !aiSettings.effective_ai_enabled && (
-                    <p className="mt-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
+                    <p className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
                       AI summaries are currently disabled for this account.
                     </p>
                   )}
 
                   {aiSettingsError && (
-                    <p className="mt-2 text-[11px] text-red-400">{aiSettingsError}</p>
+                    <p className="mt-2 text-xs text-red-400">{aiSettingsError}</p>
                   )}
                 </div>
 
