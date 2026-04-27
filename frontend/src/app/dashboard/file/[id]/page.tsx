@@ -6,8 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import Plot from "@/components/PlotNoTypes";
 import FilterPanel from "./FilterPanel";
-import AIWidget from "./AIWidget";
-import HealthDiagnosticView from "./HealthDiagnosticView";
+import ChatPanel from "./ChatPanel";
+import HealthDiagnosticView, { HealthSummaryForChat } from "./HealthDiagnosticView";
 import DashboardBuilder from "./DashboardBuilder";
 
 const SHOW_OVERVIEW_FILTERS = false;
@@ -66,6 +66,7 @@ export default function FileInsightsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
+  const [healthContext, setHealthContext] = useState<HealthSummaryForChat | null>(null);
 
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [filtersState, setFiltersState] = useState<FiltersState>({});
@@ -383,6 +384,7 @@ export default function FileInsightsPage() {
             fileName={fileTitle}
             token={tokens!.accessToken ?? ""}
             sheetName={selectedSheet}
+            onHealthLoaded={setHealthContext}
           />
         )}
 
@@ -396,14 +398,14 @@ export default function FileInsightsPage() {
         )}
       </main>
 
-      {activeTab === "overview" && (
-        <AIWidget
-          fileId={fileId}
-          initialSummary={insights?.ai_summary ?? null}
-          token={tokens!.accessToken ?? ""}
-          sheetName={selectedSheet}
-        />
-      )}
+      <ChatPanel
+        fileId={fileId}
+        token={tokens!.accessToken ?? ""}
+        currentTab={activeTab}
+        sheetName={selectedSheet}
+        healthContext={healthContext}
+        initialSummary={insights?.ai_summary ?? null}
+      />
     </div>
   );
 }

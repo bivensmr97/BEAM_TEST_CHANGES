@@ -8,6 +8,7 @@ from app.routers.insights_routes import router as insights_router
 from app.routers.reports import router as reports_router
 from app.routers.admin import router as admin_router
 from app.routers.ai_settings import router as ai_settings_router
+from app.routers.chat import router as chat_router
 
 
 app = FastAPI(
@@ -37,3 +38,4 @@ app.include_router(insights_router)
 app.include_router(reports_router)
 app.include_router(admin_router)
 app.include_router(ai_settings_router)
+app.include_router(chat_router, prefix="/api/files", tags=["chat"])

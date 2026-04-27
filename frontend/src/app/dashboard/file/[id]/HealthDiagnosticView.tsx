@@ -285,16 +285,48 @@ function ColumnTable({ columns }: { columns: ColumnDetail[] }) {
 // Module-level cache keyed by fileId — survives tab switches within the session
 const healthCache: Record<string, HealthResponse> = {};
 
+// Stripped-down health summary passed up to the parent for chat context.
+// Excludes column_details (large) — column types are loaded separately by ChatPanel.
+export type HealthSummaryForChat = {
+  score: number;
+  grade: string;
+  score_label: string;
+  total_rows: number;
+  total_columns: number;
+  duplicate_count: number;
+  issues: HealthResponse["issues"];
+  category_scores: Record<string, number>;
+  category_labels: Record<string, string>;
+  scoring_explanation: Record<string, string>;
+};
+
+function toHealthSummary(h: HealthResponse): HealthSummaryForChat {
+  return {
+    score: h.score,
+    grade: h.grade,
+    score_label: h.score_label,
+    total_rows: h.total_rows,
+    total_columns: h.total_columns,
+    duplicate_count: h.duplicate_count,
+    issues: h.issues,
+    category_scores: h.category_scores,
+    category_labels: h.category_labels,
+    scoring_explanation: h.scoring_explanation,
+  };
+}
+
 export default function HealthDiagnosticView({
   fileId,
   fileName,
   token,
   sheetName,
+  onHealthLoaded,
 }: {
   fileId: string;
   fileName?: string;
   token: string;
   sheetName?: string | null;
+  onHealthLoaded?: (summary: HealthSummaryForChat) => void;
 }) {
   const cacheKey = `${fileId}::${sheetName ?? "__default__"}`;
   const [health, setHealth] = useState<HealthResponse | null>(healthCache[cacheKey] ?? null);
@@ -303,10 +335,14 @@ export default function HealthDiagnosticView({
   const hasFetched = useRef(!!healthCache[cacheKey]);
 
   useEffect(() => {
-    setHealth(healthCache[cacheKey] ?? null);
-    setLoading(!healthCache[cacheKey]);
+    const cached = healthCache[cacheKey] ?? null;
+    setHealth(cached);
+    setLoading(!cached);
     setError(null);
-    hasFetched.current = !!healthCache[cacheKey];
+    hasFetched.current = !!cached;
+    if (cached) onHealthLoaded?.(toHealthSummary(cached));
+    // onHealthLoaded is intentionally excluded — it's a stable setter from useState
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cacheKey]);
 
   useEffect(() => {
@@ -345,6 +381,7 @@ export default function HealthDiagnosticView({
         if (!cancelled) {
           healthCache[cacheKey] = data;
           setHealth(data);
+          onHealthLoaded?.(toHealthSummary(data));
         }
       } catch (err: unknown) {
         if (!cancelled) {
