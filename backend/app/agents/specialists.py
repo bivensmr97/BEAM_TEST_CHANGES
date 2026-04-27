@@ -249,6 +249,55 @@ def build_specialist_messages(
     return messages
 
 
+def build_chart_narrative_messages(
+    chart_title: str,
+    chart_type: str,
+    x_label: str,
+    y_label: str,
+    agg: str,
+    data_summary: str,
+    file_name: str,
+) -> list[dict]:
+    """Messages for generating a plain-English narrative for a single chart. No orchestrator needed."""
+    _chart_labels = {
+        "bar": "bar chart", "line": "line chart", "scatter": "scatter plot",
+        "histogram": "distribution chart", "box": "range & outliers chart", "pie": "pie chart",
+    }
+    _agg_labels = {"sum": "total", "mean": "average", "median": "median", "count": "count"}
+
+    chart_desc = _chart_labels.get(chart_type, f"{chart_type} chart")
+    agg_desc = _agg_labels.get(agg, agg)
+
+    axes = []
+    if x_label:
+        axes.append(f"X AXIS: {x_label}")
+    if y_label:
+        axes.append(f"Y AXIS: {y_label}" + (f" ({agg_desc})" if agg_desc else ""))
+    axes_block = "\n".join(axes)
+
+    system = f"""You are a data analyst for BEAM Analytics writing a brief plain-English narrative for a business user about a single chart.
+
+FILE: {file_name}
+CHART: "{chart_title}" ({chart_desc})
+{axes_block}
+
+DATA:
+{data_summary if data_summary else "Data not available."}
+
+RULES:
+- 2-4 sentences maximum — be concise
+- Lead with the single most important insight (highest value, strongest trend, biggest gap, etc.)
+- Reference specific numbers from the data above when they add clarity
+- End with a practical takeaway or question this chart helps answer
+- Never invent data not shown above
+- Do not say "this chart shows" or "this chart depicts" — just tell them what it means"""
+
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "What is this chart telling me?"},
+    ]
+
+
 def build_explain_messages(
     issue: dict,
     file_name: str,

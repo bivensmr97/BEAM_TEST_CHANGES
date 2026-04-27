@@ -139,6 +139,105 @@ function errorMessage(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback;
 }
 
+// ── Chart narrative helpers ────────────────────────────────────────────────────
+
+async function streamSSE(
+  url: string,
+  body: unknown,
+  token: string,
+  onToken: (text: string) => void,
+  onError: (msg: string) => void,
+  onDone: () => void,
+  signal: AbortSignal,
+) {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok || !res.body) { onError("Request failed"); onDone(); return; }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop() ?? "";
+      for (const part of parts) {
+        for (const line of part.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+          try {
+            const evt = JSON.parse(raw);
+            if (evt.type === "token") onToken(evt.content);
+            else if (evt.type === "error") onError(evt.content);
+            else if (evt.type === "done") onDone();
+          } catch { /* ignore malformed */ }
+        }
+      }
+    }
+  } catch (err: unknown) {
+    if ((err as Error).name !== "AbortError") onError("Could not reach the AI. Please try again.");
+    onDone();
+  }
+}
+
+type PlotTrace = Record<string, unknown>;
+
+function extractDataSummary(fig: PlotFigure): string {
+  if (!fig.data?.length) return "";
+  const trace = fig.data[0] as PlotTrace;
+  const type = String(trace.type ?? "");
+  const lines: string[] = [];
+
+  if (type === "pie") {
+    const labels = (trace.labels as string[]) ?? [];
+    const values = (trace.values as number[]) ?? [];
+    const total = values.reduce((a, b) => a + b, 0);
+    lines.push(`Total: ${total.toLocaleString()}`);
+    labels
+      .map((l, i) => ({ l, v: values[i] ?? 0 }))
+      .sort((a, b) => b.v - a.v)
+      .slice(0, 8)
+      .forEach(({ l, v }) => {
+        const pct = total > 0 ? ((v / total) * 100).toFixed(1) : "0";
+        lines.push(`  ${l}: ${v.toLocaleString()} (${pct}%)`);
+      });
+  } else {
+    const x = (trace.x as unknown[]) ?? [];
+    const y = (trace.y as number[]) ?? [];
+    const numY = y.filter((v) => typeof v === "number");
+    if (numY.length) {
+      const total = numY.reduce((a, b) => a + b, 0);
+      const min = Math.min(...numY);
+      const max = Math.max(...numY);
+      lines.push(`Total: ${total.toLocaleString()}, Min: ${min.toLocaleString()}, Max: ${max.toLocaleString()}`);
+      x.map((xi, i) => ({ xi: String(xi), yi: y[i] ?? 0 }))
+        .sort((a, b) => b.yi - a.yi)
+        .slice(0, 10)
+        .forEach(({ xi, yi }) => lines.push(`  ${xi}: ${yi.toLocaleString()}`));
+    } else if (x.length) {
+      const nums = x.filter((v) => typeof v === "number") as number[];
+      if (nums.length) {
+        const sorted = [...nums].sort((a, b) => a - b);
+        const mean = (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        lines.push(`Count: ${nums.length}, Min: ${sorted[0].toLocaleString()}, Max: ${sorted[sorted.length - 1].toLocaleString()}`);
+        lines.push(`Mean: ${mean}, Median: ${median.toLocaleString()}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
 // ── Validation ─────────────────────────────────────────────────────────────────
 
 function validate(cfg: ChartConfig, numCols: string[]): string | null {
@@ -212,6 +311,8 @@ function ChartCard({
   onRemove,
   onGenerate,
   plotLayout,
+  fileId,
+  token,
 }: {
   cfg: ChartConfig;
   cols: ColMeta[];
@@ -221,7 +322,50 @@ function ChartCard({
   onRemove: () => void;
   onGenerate: () => void;
   plotLayout: object;
+  fileId: string;
+  token: string;
 }) {
+  const [narrateState, setNarrateState] = React.useState<"idle" | "loading" | "done" | "error">("idle");
+  const [narrative, setNarrative] = React.useState("");
+  const narrateAbortRef = React.useRef<AbortController | null>(null);
+
+  // Reset narrative when chart is rebuilt
+  React.useEffect(() => {
+    setNarrateState("idle");
+    setNarrative("");
+  }, [renderedFig]);
+
+  function handleNarrate() {
+    if (!renderedFig || narrateState === "loading") return;
+    setNarrative("");
+    setNarrateState("loading");
+
+    const controller = new AbortController();
+    narrateAbortRef.current = controller;
+
+    streamSSE(
+      `${API_BASE_URL}/api/files/${fileId}/chart-narrative`,
+      {
+        chart_title: cfg.title || friendly(cfg.x || cfg.y || "Chart"),
+        chart_type: cfg.chart_type,
+        x_label: cfg.x ? friendly(cfg.x) : "",
+        y_label: cfg.y ? friendly(cfg.y) : "",
+        agg: cfg.agg,
+        data_summary: extractDataSummary(renderedFig),
+      },
+      token,
+      (text) => setNarrative((prev) => prev + text),
+      (msg) => { setNarrative(msg); setNarrateState("error"); },
+      () => setNarrateState((s) => s !== "error" ? "done" : "error"),
+      controller.signal,
+    );
+  }
+
+  function handleDismissNarrative() {
+    narrateAbortRef.current?.abort();
+    setNarrateState("idle");
+    setNarrative("");
+  }
   const meta = CHART_META[cfg.chart_type];
   const numCols = cols.filter((c) => c.inferred_type === "numeric");
   const catCols = cols.filter((c) => c.inferred_type === "categorical");
@@ -358,7 +502,7 @@ function ChartCard({
       </div>
 
       {/* ── Output ── */}
-      <div className="px-4 py-4">
+      <div className="px-4 py-4 space-y-3">
         {isRunning && (
           <div className="flex items-center justify-center py-10 text-sm text-[var(--text-muted)]">
             <span className="animate-pulse">Building your chart…</span>
@@ -366,14 +510,59 @@ function ChartCard({
         )}
 
         {!isRunning && renderedFig && (
-          <div className="h-[340px] w-full">
-            <Plot
-              data={renderedFig.data}
-              layout={{ ...(renderedFig.layout ?? {}), ...plotLayout, title: undefined }}
-              config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d", "toImage"] }}
-              style={{ width: "100%", height: "100%" }}
-            />
-          </div>
+          <>
+            <div className="h-[340px] w-full">
+              <Plot
+                data={renderedFig.data}
+                layout={{ ...(renderedFig.layout ?? {}), ...plotLayout, title: undefined }}
+                config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d", "toImage"] }}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
+
+            {/* Narrative */}
+            <div className="flex items-center justify-end gap-2">
+              {narrateState === "idle" && (
+                <button
+                  type="button"
+                  onClick={handleNarrate}
+                  className="text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/60 rounded-lg px-2.5 py-1 transition-colors"
+                >
+                  ✦ Narrate
+                </button>
+              )}
+              {narrateState === "loading" && (
+                <span className="text-xs text-[var(--text-muted)] animate-pulse">Analysing…</span>
+              )}
+              {narrateState === "done" && (
+                <>
+                  <button type="button" onClick={handleNarrate} className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">Refresh</button>
+                  <button type="button" onClick={handleDismissNarrative} className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">Hide</button>
+                </>
+              )}
+              {narrateState === "error" && (
+                <button type="button" onClick={handleDismissNarrative} className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors">Dismiss</button>
+              )}
+            </div>
+
+            {narrateState !== "idle" && (
+              <div className={`rounded-lg border px-3 py-2.5 text-sm leading-relaxed ${
+                narrateState === "error"
+                  ? "border-red-500/30 bg-red-950/20 text-red-300"
+                  : "border-cyan-500/20 bg-cyan-950/20 text-[var(--text-main)]"
+              }`}>
+                <p className="text-xs font-semibold text-cyan-400 mb-1">✦ AI Narrative</p>
+                {narrateState === "loading" && !narrative && (
+                  <span className="inline-flex gap-1 items-center h-4">
+                    {[0, 1, 2].map((i) => (
+                      <span key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                    ))}
+                  </span>
+                )}
+                {narrative && <span className="whitespace-pre-wrap">{narrative}</span>}
+              </div>
+            )}
+          </>
         )}
 
         {!isRunning && !renderedFig && isReady && (
@@ -1019,6 +1208,8 @@ export default function DashboardBuilder({
             onRemove={() => removeChart(cfg.id)}
             onGenerate={() => generateCharts([cfg.id])}
             plotLayout={plotLayout}
+            fileId={fileId}
+            token={token}
           />
         ))}
       </div>
