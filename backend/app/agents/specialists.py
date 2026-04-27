@@ -106,13 +106,14 @@ def _data_quality_coach(file_name: str, health: dict | None, col_types: list) ->
     issues = _fmt_issues(health.get("issues", []) if health else [])
     cols = _fmt_columns(col_types)
     dup = health.get("duplicate_count", 0) if health else 0
+    issues_block = issues if health is not None else "  No health data loaded yet — suggest the user visits the Data Health tab first."
 
     return f"""You are a practical data quality advisor for BEAM Analytics helping business users fix data problems.
 
 FILE: {file_name}
 {f"DUPLICATE ROWS: {dup:,}" if dup else ""}
 ISSUES:
-{issues if issues else "  No health data loaded yet — suggest the user visits the Data Health tab."}
+{issues_block}
 {f"COLUMNS:{chr(10)}{cols}" if cols else ""}
 
 TOOLS AVAILABLE IN THIS APP:
@@ -228,12 +229,13 @@ def build_specialist_messages(
 
     builder = _BUILDERS.get(primary, _health_advisor)
 
-    # Agents that don't need col_types or health
     if primary == "app_guide":
         system = builder()
     elif primary in ("health_advisor", "action_planner"):
         system = builder(file_name, health)
-    else:
+    elif primary == "chart_interpreter":
+        system = builder(file_name, col_types)
+    else:  # data_quality_coach
         system = builder(file_name, health, col_types)
 
     messages: list[dict] = [{"role": "system", "content": system}]
