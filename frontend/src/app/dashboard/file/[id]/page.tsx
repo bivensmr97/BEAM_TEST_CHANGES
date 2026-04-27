@@ -193,9 +193,21 @@ function OverviewChartCard({
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const getAxisTitle = (axis: unknown): string => {
+      if (!axis) return "";
+      const a = axis as Record<string, unknown>;
+      if (typeof a.title === "string") return a.title;
+      if (a.title && typeof (a.title as Record<string, unknown>).text === "string") {
+        return (a.title as Record<string, unknown>).text as string;
+      }
+      return "";
+    };
+    const xLabel = getAxisTitle(fig.layout?.xaxis);
+    const yLabel = getAxisTitle(fig.layout?.yaxis);
+
     streamSSE(
       `${API_BASE_URL}/api/files/${fileId}/chart-narrative`,
-      { chart_title: title, chart_type: chartType, data_summary: extractDataSummary(fig) },
+      { chart_title: title, chart_type: chartType, x_label: xLabel, y_label: yLabel, agg: "", data_summary: extractDataSummary(fig) },
       token,
       (text) => setNarrative((prev) => prev + text),
       (msg) => { setNarrative(msg); setNarrateState("error"); },

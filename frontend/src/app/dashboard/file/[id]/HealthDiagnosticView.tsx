@@ -337,7 +337,7 @@ function ActionPlanSection({
           )}
           <button
             type="button"
-            onClick={state === "idle" || state === "error" ? handleGenerate : undefined}
+            onClick={state !== "loading" ? handleGenerate : undefined}
             disabled={state === "loading"}
             className="shrink-0 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 transition-colors"
           >
