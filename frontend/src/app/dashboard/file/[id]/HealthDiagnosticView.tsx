@@ -119,23 +119,249 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
-function IssueCard({ issue }: { issue: IssueOut }) {
+async function streamSSE(
+  url: string,
+  body: unknown,
+  token: string,
+  onToken: (text: string) => void,
+  onError: (msg: string) => void,
+  onDone: () => void,
+  signal: AbortSignal,
+) {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!res.ok || !res.body) { onError("Request failed"); onDone(); return; }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop() ?? "";
+      for (const part of parts) {
+        for (const line of part.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+          try {
+            const evt = JSON.parse(raw);
+            if (evt.type === "token") onToken(evt.content);
+            else if (evt.type === "error") onError(evt.content);
+            else if (evt.type === "done") onDone();
+          } catch { /* ignore malformed */ }
+        }
+      }
+    }
+  } catch (err: unknown) {
+    if ((err as Error).name !== "AbortError") onError("Could not reach the AI. Please try again.");
+    onDone();
+  }
+}
+
+function IssueCard({
+  issue,
+  fileId,
+  token,
+  totalRows,
+  totalColumns,
+}: {
+  issue: IssueOut;
+  fileId: string;
+  token: string;
+  totalRows: number;
+  totalColumns: number;
+}) {
   const borderColor =
     issue.severity === "critical" ? "border-red-400/50"
     : issue.severity === "warning" ? "border-amber-400/50"
     : "border-blue-400/30";
 
+  const [explainState, setExplainState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [explanation, setExplanation] = useState("");
+  const abortRef = React.useRef<AbortController | null>(null);
+
+  function handleExplain() {
+    if (explainState === "loading") return;
+    setExplanation("");
+    setExplainState("loading");
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    streamSSE(
+      `${API_BASE_URL}/api/files/${fileId}/explain-issue`,
+      { issue: { key: issue.key, severity: issue.severity, title: issue.title, plain_message: issue.plain_message, recommendation: issue.recommendation }, total_rows: totalRows, total_columns: totalColumns },
+      token,
+      (text) => setExplanation((prev) => prev + text),
+      (msg) => { setExplanation(msg); setExplainState("error"); },
+      () => setExplainState((s) => s !== "error" ? "done" : "error"),
+      controller.signal,
+    );
+  }
+
+  function handleDismiss() {
+    abortRef.current?.abort();
+    setExplainState("idle");
+    setExplanation("");
+  }
+
   return (
     <div className={`rounded-xl border ${borderColor} bg-[color:var(--bg-panel)] p-4 space-y-2`}>
       <div className="flex items-start gap-3 flex-wrap">
         <SeverityBadge severity={issue.severity} />
-        <p className="font-semibold text-[var(--text-main)] text-sm leading-snug">{issue.title}</p>
+        <p className="font-semibold text-[var(--text-main)] text-sm leading-snug flex-1">{issue.title}</p>
+        {explainState === "idle" && (
+          <button
+            type="button"
+            onClick={handleExplain}
+            className="shrink-0 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/60 rounded-lg px-2.5 py-1 transition-colors"
+          >
+            ✦ Explain this
+          </button>
+        )}
+        {(explainState === "done" || explainState === "error") && (
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="shrink-0 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+          >
+            Hide
+          </button>
+        )}
       </div>
       <p className="text-sm text-[var(--text-muted)] leading-relaxed">{issue.plain_message}</p>
       <div className="rounded-lg bg-[color:var(--bg-main)] border border-[var(--border)] px-3 py-2">
         <p className="text-xs font-semibold text-[var(--text-main)] mb-0.5">Next step</p>
         <p className="text-xs text-[var(--text-muted)] leading-relaxed">{issue.recommendation}</p>
       </div>
+
+      {explainState !== "idle" && (
+        <div className={`rounded-lg border px-3 py-2.5 text-sm leading-relaxed ${
+          explainState === "error"
+            ? "border-red-500/30 bg-red-950/20 text-red-300"
+            : "border-cyan-500/20 bg-cyan-950/20 text-[var(--text-main)]"
+        }`}>
+          <p className="text-xs font-semibold text-cyan-400 mb-1">✦ AI Explanation</p>
+          {explainState === "loading" && !explanation && (
+            <span className="inline-flex gap-1 items-center h-4">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </span>
+          )}
+          {explanation && <span className="whitespace-pre-wrap">{explanation}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionPlanSection({
+  fileId,
+  token,
+  health,
+}: {
+  fileId: string;
+  token: string;
+  health: HealthResponse;
+}) {
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [plan, setPlan] = useState("");
+  const abortRef = React.useRef<AbortController | null>(null);
+
+  function handleGenerate() {
+    if (state === "loading") return;
+    setPlan("");
+    setState("loading");
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const healthPayload = {
+      score: health.score,
+      grade: health.grade,
+      score_label: health.score_label,
+      total_rows: health.total_rows,
+      total_columns: health.total_columns,
+      duplicate_count: health.duplicate_count,
+      issues: health.issues,
+      category_scores: health.category_scores,
+      category_labels: health.category_labels,
+      scoring_explanation: health.scoring_explanation,
+    };
+
+    streamSSE(
+      `${API_BASE_URL}/api/files/${fileId}/action-plan`,
+      { health: healthPayload },
+      token,
+      (text) => setPlan((prev) => prev + text),
+      (msg) => { setPlan(msg); setState("error"); },
+      () => setState((s) => s !== "error" ? "done" : "error"),
+      controller.signal,
+    );
+  }
+
+  function handleReset() {
+    abortRef.current?.abort();
+    setState("idle");
+    setPlan("");
+  }
+
+  return (
+    <div className="rounded-xl border border-cyan-500/20 bg-[color:var(--bg-panel)] p-5 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text-main)]">✦ AI Action Plan</h3>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+            Get 3 prioritised steps to improve this dataset
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {state === "done" && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={state === "idle" || state === "error" ? handleGenerate : undefined}
+            disabled={state === "loading"}
+            className="shrink-0 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 transition-colors"
+          >
+            {state === "loading" ? "Generating…" : state === "done" ? "Regenerate" : "Generate"}
+          </button>
+        </div>
+      </div>
+
+      {state !== "idle" && (
+        <div className={`rounded-lg border px-4 py-3 text-sm leading-relaxed ${
+          state === "error"
+            ? "border-red-500/30 bg-red-950/10 text-red-300"
+            : "border-[var(--border)] bg-[color:var(--bg-main)] text-[var(--text-main)]"
+        }`}>
+          {state === "loading" && !plan && (
+            <span className="inline-flex gap-1 items-center h-4">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </span>
+          )}
+          {plan && <span className="whitespace-pre-wrap">{plan}</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -525,6 +751,9 @@ export default function HealthDiagnosticView({
         )}
       </div>
 
+      {/* ---- Action Plan ---- */}
+      <ActionPlanSection fileId={fileId} token={token} health={health} />
+
       {/* ---- Issues list ---- */}
       {health.issues.length > 0 ? (
         <div className="space-y-3">
@@ -532,7 +761,16 @@ export default function HealthDiagnosticView({
           {(["critical", "warning", "info"] as const).flatMap((sev) =>
             health.issues
               .filter((i) => i.severity === sev)
-              .map((issue) => <IssueCard key={issue.key} issue={issue} />)
+              .map((issue) => (
+                <IssueCard
+                  key={issue.key}
+                  issue={issue}
+                  fileId={fileId}
+                  token={token}
+                  totalRows={health.total_rows}
+                  totalColumns={health.total_columns}
+                />
+              ))
           )}
         </div>
       ) : (

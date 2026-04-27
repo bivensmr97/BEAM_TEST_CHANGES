@@ -247,3 +247,75 @@ def build_specialist_messages(
 
     messages.append({"role": "user", "content": message})
     return messages
+
+
+def build_explain_messages(
+    issue: dict,
+    file_name: str,
+    file_rows: int = 0,
+    file_columns: int = 0,
+) -> list[dict]:
+    """Messages for explaining a single health issue in plain English. No orchestrator needed — intent is known."""
+    sev_map = {"critical": "Action Required", "warning": "Warning", "info": "Note"}
+    sev_label = sev_map.get(issue.get("severity", "info"), "Note")
+
+    system = f"""You are a data quality expert for BEAM Analytics explaining a specific data issue to a non-technical business user.
+
+FILE: {file_name}
+SIZE: {file_rows:,} records across {file_columns} fields
+
+ISSUE:
+  Severity: {sev_label}
+  Title: {issue.get("title", "")}
+  Description: {issue.get("plain_message", "")}
+  Recommended action: {issue.get("recommendation", "")}
+
+RULES:
+- Explain in plain business English — no technical jargon
+- Start with what this means practically for the business or decision-making
+- Briefly explain why this type of issue occurs and why it matters
+- Be specific to this file's numbers where possible
+- 3-5 sentences total — concise but complete
+- End with the single most important action the user should take"""
+
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "Can you explain this issue to me in plain terms? What does it mean and why does it matter?"},
+    ]
+
+
+def build_action_plan_messages(
+    health: dict,
+    file_name: str,
+) -> list[dict]:
+    """Messages for a 3-item prioritised action plan. No orchestrator needed — intent is known."""
+    issues = _fmt_issues(health.get("issues", []))
+    dup = health.get("duplicate_count", 0)
+
+    system = f"""You are a strategic data quality advisor for BEAM Analytics creating a prioritised action plan for a business user.
+
+FILE: {file_name}
+HEALTH SCORE: {health.get("score", "?")}/100 (Grade {health.get("grade", "?")}) — {health.get("score_label", "")}
+SIZE: {health.get("total_rows", 0):,} records across {health.get("total_columns", 0)} fields
+DUPLICATE ROWS: {dup:,}
+
+ISSUES:
+{issues if issues else "  No significant issues detected."}
+
+TOOLS AVAILABLE IN THE APP:
+- Remove duplicate rows — shown on the Data Health tab when duplicates exist; downloads a clean CSV
+- Charts tab — explore the data visually to spot patterns and outliers
+- File Overview tab — auto-generated KPI metrics and charts
+- Download original — arrow icon next to each file in the sidebar
+
+RULES:
+- Output EXACTLY 3 numbered actions, ordered by business impact (highest first)
+- Format each action as: "1. **[Short title]** — [1-2 sentences explaining why and exactly how]"
+- Reference exact app tool names where they apply
+- Frame actions as business outcomes, not technical tasks
+- If data is already clean (score ≥ 90), briefly acknowledge it and suggest productive next steps"""
+
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "Create my prioritised action plan for this data file."},
+    ]
