@@ -939,3 +939,94 @@ def build_custom_charts(
             charts_out[req.id] = result
 
     return {"charts": charts_out}
+
+
+# ---------------------------------------------------------------------------
+# Dedupe
+# ---------------------------------------------------------------------------
+
+class DedupeIn(BaseModel):
+    mode: str = "full_row"          # "full_row" | "columns"
+    columns: List[str] = []         # only used when mode == "columns"
+    keep: str = "first"             # "first" | "last"
+    sheet_name: Optional[str] = None
+
+
+class DedupePreviewOut(BaseModel):
+    original_rows: int
+    duplicate_count: int
+    cleaned_rows: int
+    pct_removed: float
+
+
+def _run_dedupe(df: pd.DataFrame, payload: DedupeIn) -> pd.DataFrame:
+    keep = payload.keep if payload.keep in ("first", "last") else "first"
+    if payload.mode == "columns" and payload.columns:
+        valid_cols = [c for c in payload.columns if c in df.columns]
+        if not valid_cols:
+            raise HTTPException(status_code=422, detail="None of the specified columns exist in this file.")
+        return df.drop_duplicates(subset=valid_cols, keep=keep)
+    return df.drop_duplicates(keep=keep)
+
+
+@router.post("/{file_id}/dedupe/preview", response_model=DedupePreviewOut)
+def dedupe_preview(
+    file_id: str,
+    payload: DedupeIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    file = (
+        db.query(FileModel)
+        .filter(FileModel.id == file_id, FileModel.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    df = _load_dataframe_from_blob(file, sheet_name=payload.sheet_name)
+    cleaned = _run_dedupe(df, payload)
+
+    original_rows = len(df)
+    cleaned_rows = len(cleaned)
+    duplicate_count = original_rows - cleaned_rows
+    pct_removed = round((duplicate_count / original_rows * 100) if original_rows > 0 else 0.0, 2)
+
+    return DedupePreviewOut(
+        original_rows=original_rows,
+        duplicate_count=duplicate_count,
+        cleaned_rows=cleaned_rows,
+        pct_removed=pct_removed,
+    )
+
+
+@router.post("/{file_id}/dedupe/download")
+def dedupe_download(
+    file_id: str,
+    payload: DedupeIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    file = (
+        db.query(FileModel)
+        .filter(FileModel.id == file_id, FileModel.tenant_id == user.tenant_id)
+        .first()
+    )
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    df = _load_dataframe_from_blob(file, sheet_name=payload.sheet_name)
+    cleaned = _run_dedupe(df, payload)
+
+    base = file.original_name.rsplit(".", 1)[0] if "." in file.original_name else file.original_name
+    download_name = f"{base}_deduped.csv"
+
+    buf = io.StringIO()
+    cleaned.to_csv(buf, index=False)
+    buf.seek(0)
+
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": _content_disposition_attachment(download_name)},
+    )

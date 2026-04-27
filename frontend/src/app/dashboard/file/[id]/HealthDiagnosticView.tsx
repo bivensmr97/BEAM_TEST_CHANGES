@@ -15,6 +15,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
+import DedupePanel from "./DedupePanel";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -504,6 +505,17 @@ export default function HealthDiagnosticView({
             Your dataset passed all health checks. Keep up the good work!
           </p>
         </div>
+      )}
+
+      {/* ---- Dedupe CTA ---- */}
+      {health.duplicate_count > 0 && (
+        <DedupePanel
+          fileId={fileId}
+          token={token}
+          columns={health.column_details.map((c) => c.name)}
+          sheetName={sheetName}
+          duplicateCount={health.duplicate_count}
+        />
       )}
 
       {/* ---- Field-by-Field Breakdown ---- */}
